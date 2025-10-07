@@ -17,128 +17,120 @@
 \section*{1. Team members}
 \begin{itemize}
   \item Imran Chowdhury — 400470828 — chowdi13@mcmaster.ca
-  \item Member 2: Name  — email
-  \item Member 3: Name  — email
+  \item Member 2: Karim Elbasiouni — email
+  \item Member 3: Rami Abu Sultan — email
 \end{itemize}
 
 \section*{2. Task title and overview}
-Task title and overview, including the significance and what makes it challenging 
+\textbf{Title:} CareerCompass — Resume $\rightarrow$ Job Title \& Occupation Family Classification
+
+\textbf{Overview:} Build a system that ingests a resume (PDF/DOCX/TXT or pasted text) and predicts (1) a fine-grained job title (e.g., Software Engineer, Data Analyst) and (2) a coarse occupation family (O*NET/SOC major group, e.g., Computer \& Mathematical Occupations).  
+
+\textbf{Significance:} Automated routing of candidates improves recruiter efficiency, speeds screening, and enables analytics on talent pools.  
+
+\textbf{Challenges:} Resumes are unstructured; titles are noisy; class imbalance; PII must be removed; hierarchical consistency between title and family must be maintained.
 
 \section*{3. Task definition}
-3. Task definition (type of data, classification/regression/generation, number of classes, single label or multi-label) 
 \begin{itemize}
-  \item Data type(s): (e.g., text, images, audio, tabular, multimodal).
-  \item Task category: classification / regression / generation / detection / segmentation / ranking.
-  \item Number of classes (if classification): e.g., 3 classes: \{A, B, C\}
-  \item Labeling scheme: single-label or multi-label. If multi-label, list the labels and whether they are independent.
-  \item Input / output shapes (short): e.g., input: text (<= 256 tokens), output: single class label.
+  \item Data type(s): text (PDF/DOCX/TXT)
+  \item Task category: classification (two-head, multi-class)
+  \item Number of classes:
+    \begin{itemize}
+      \item Fine-grained job titles: ~60 classes
+      \item Occupation families: 23 classes
+    \end{itemize}
+  \item Labeling scheme: single-label per head
+  \item Input / output: input: text (resume content); output: title class + family class
 \end{itemize}
 
 \section*{4. Problem description, impact, and challenges}
-4. Describe the problem, it’s impact on the real world, and why it is challenging \\ \\
-\textbf{Problem description:} One concise paragraph explaining the problem and the stakeholders affected.\\[4pt]
-\textbf{Real-world impact:} Bulleted list (e.g., business benefit, societal impact, cost/time savings).\\[4pt]
+\textbf{Problem description:} Recruiters spend substantial time manually triaging resumes; automated classification reduces repetitive work, improves traceability, and highlights skill-role alignment.  
+
+\textbf{Real-world impact:}
+\begin{itemize}
+  \item Reduces screening time and improves consistency
+  \item Enables analysis of talent pools and skills coverage
+  \item Supports large-scale hiring (university fairs, bulk intakes)
+\end{itemize}
+
 \textbf{Why it's challenging:}
 \begin{itemize}
-  \item Data-specific issues (noise, missing values, unbalanced classes).
-  \item Task-specific issues (ambiguous labels, domain shift, fine-grained distinctions).
-  \item Operational issues (rate limits, privacy/regulation, annotation cost).
+  \item Unstructured text: varied formats, multi-column PDFs, OCR artifacts
+  \item Label noise and synonymy: multiple ways to express same role, seniority suffixes
+  \item Imbalance \& long tail: niche roles with few examples
+  \item Fairness \& privacy: exclude protected attributes and scrub PII
+  \item Hierarchical consistency: title must align with occupation family
 \end{itemize}
 
 \section*{5. Data sources and collection plan}
- Data source(s) and plan for data collection. This may include how you are going to scrape the data
-  and follow terms-of-service, API access and handling rate limiting, using open-source data, or 
-  any other relevant details. If your data does not have labels, how do you plan to get them? If 
-  assigning labels by hand, how long does it take per instance? Include links to the data if relevant.
-  If you download your dataset from Kaggle, you must include the Kaggle link and the original data source link
-  from where the dataset was downloaded and posted on Kaggle. Include any meta-data available for 
-  your corpus. If you are not collecting it yourself, include details about how the data was collected, annotated, preprocessed, etc. Do not work on the
- datasets for which no source information is available. Please indicate whether you will use a small
- subset of the data or features for your project or the entire dataset, and why. 
-
 \begin{itemize}
-  \item Primary data source(s): name the dataset(s) and provide direct links. If using Kaggle, include both the Kaggle page and the dataset's original source.
-    \begin{itemize}
-      \item Example: \href{https://www.kaggle.com/example}{Kaggle: Example Dataset} — original source: \href{https://original-source.example}{Original Source}
-    \end{itemize}
-  \item If scraping / API: explain planned approach and compliance
-    \begin{itemize}
-      \item API endpoints or websites to query.
-      \item Authentication and rate-limiting strategy (API keys, exponential backoff, pagination).
-      \item Respecting terms of service and robots.txt. Provide a short sentence about legal/ethical compliance.
-    \end{itemize}
-  \item Labeling plan:
-    \begin{itemize}
-      \item If labels exist: note format and any preprocessing needed.
-      \item If labeling manually or via crowdsourcing: describe annotation guidelines, estimated time per instance, and consensus process (e.g., 3 annotators + majority vote). Example: 90 seconds per instance $\Rightarrow$ 1000 examples $\approx$ 25 hours of annotation.
-    \end{itemize}
-  \item Preprocessing:
-    \begin{itemize}
-      \item Cleaning steps (deduplication, normalization, resizing, tokenization).
-      \item Handling missing data and noisy labels.
-    \end{itemize}
-  \item Subsetting decision:
-    \begin{itemize}
-      \item Will you use entire dataset or a subset? State reason (compute constraints, label quality, class balance).
-    \end{itemize}
-  \item Metadata available: list fields like timestamps, source, author, confidence scores, etc.
+  \item Primary dataset: Kaggle Resume Dataset by \href{https://www.kaggle.com/datasets/rayyankauchali0/resume-dataset?resource=download}{rayyankauchali0} (CC BY 4.0)
+  \item Mixture of real and synthetic anonymized resumes; inspired by ResumeAtlas (HuggingFace) and datasetmaster/resumes
+  \item Preprocessing: PDF/DOCX $\rightarrow$ text, remove PII, normalize titles
+  \item Label construction: most recent experience title, alias normalization, map to SOC family
+  \item Train/validation/test splits stratified by role and source type; held-out real-only test set
+  \item Metadata: rows by source, class counts, section presence, token length distributions
 \end{itemize}
 
 \section*{6. Expected dataset size and example datapoints}
-6. Expected size of the dataset (number of data points) and 3 example data points with labels. Your dataset should have at least 1k data points. 
-Some projects will have more or less data.\\ 
-\textbf{Expected size:} Approximate number of data points (must be $\ge$ 1,000). Example: 10,000 instances.\\[6pt]
-\textbf{Three example data points (show input $\rightarrow$ label):} \\
+\textbf{Expected size:} 3,500+ resumes total; ≥3,200 usable after filtering. \\
+Fine-grained titles: ~60 classes, Occupation families: 23 classes
+
+\textbf{Three example records:} \\[2pt]
 \begin{tabular}{p{0.62\linewidth} p{0.32\linewidth}}
 \toprule
-Example input & Label(s) \\
+Text snippet (input) & Label(s) \\
 \midrule
-"Example text or short description of instance 1" & Class A \\
-"Example text or short description of instance 2" & Class B \\
-"Example text or short description of instance 3" & Class A, Class C (if multi-label) \\
+“…10 yrs software design & development — senior Java developer / tech lead at Synnex (2014-Now)… REST APIs, Spring Boot…” & Software Engineer / Computer \& Mathematical \\
+“…enthusiastic Java developer (3 yrs) — reduced app memory 30\%, startup time 70\%. Roles at DaCoderz & Quantexx…” & Java Developer / Computer \& Mathematical \\
+“…8 yrs delivering enterprise Java/J2EE solutions; Spring Boot, microservices, AWS; Sr Java Dev @ Fiserv (2021-Now)…” & Software Engineer / Computer \& Mathematical \\
 \bottomrule
 \end{tabular}
 
 \section*{7. Proposed solution}
-7. Proposed solution: How do you plan to go about solving this problem? It is okay to not know how the machine learning models work at this point in the class,
-but you should be starting to get some idea based on the lectures and assigned readings. What kind of features and target labels do you have? What kind of models 
-might you try? You may not propose simple linear regression models for this project. Are there any existing solutions to your problem? You must indicate 2-5 sources 
-(research papers, books, machine learning challenges online) from where your solution was inspired. Put some thought into how you would approach this. How will you 
-know if the model is good? How will you evaluate it? Also, share the libraries you intend to use for the project.  
-\textbf{High-level approach:} Short paragraph describing end-to-end plan (data $\rightarrow$ features $\rightarrow$ model $\rightarrow$ evaluation).\\[4pt]
+\textbf{High-level approach:} Resume $\rightarrow$ preprocessing $\rightarrow$ feature extraction $\rightarrow$ two-head classifier (title + family) $\rightarrow$ evaluation and interpretation
 
 \textbf{Features / inputs:}
 \begin{itemize}
-  \item Raw features (e.g., text, images).
-  \item Engineered features (e.g., TF-IDF, sentiment, metadata, image embeddings).
-  \item Data augmentation strategies where appropriate.
+  \item Text features: normalized text (Experience $\rightarrow$ Skills $\rightarrow$ Summary/Education), TF-IDF vectors, or embeddings (DistilBERT / Sentence-BERT)
+  \item Structured features: section flags, token counts, average bullet length, skill dictionary hits (Python, SQL, AWS, Kubernetes, Terraform)
 \end{itemize}
 
 \textbf{Model candidates:}
 \begin{itemize}
-  \item Baseline(s): simple non-linear baselines such as Random Forest, XGBoost, or a small CNN/classifier trained from scratch.
-  \item Advanced models: pre-trained transformer (e.g., BERT/RoBERTa) fine-tuning; or pre-trained ResNet/ViT for images; or multimodal fusion approaches if applicable.
-  \item Avoid only linear regression; include at least one deep or ensemble method.
+  \item Baseline: Linear SVM, LightGBM
+  \item Advanced: DistilBERT / Sentence-BERT two-head multi-task classifier
+  \item Handle class imbalance with class weights/focal loss; collapse rare titles into Other
 \end{itemize}
 
 \textbf{Evaluation plan:}
 \begin{itemize}
-  \item Metrics: accuracy / F1 (micro \& macro) / precision \& recall / AUC-ROC / RMSE (if regression). Choose metrics matching task and class imbalance.
-  \item Validation scheme: train / validation / test split, possibly stratified k-fold cross-validation.
-  \item Baseline vs target performance: define success criteria (e.g., beat baseline by X\% absolute F1 or achieve F1 $\ge$ 0.75).
-  \item Error analysis \& robustness checks: confusion matrix, failure case examples, calibration, domain shift testing.
+  \item Job title: Top-1 / Top-3 accuracy, macro-F1, confusion analysis
+  \item Occupation family: accuracy + hierarchical correctness
+  \item Calibration: Brier score, reliability curves
+  \item Robustness: real-only vs mixed test, short vs long resumes
+  \item Fairness: slices based on resume length and section presence
+\end{itemize}
+
+\textbf{Interpretability:}
+\begin{itemize}
+  \item Baseline: SHAP on n-grams and skill features
+  \item Transformer: token-level attention highlights + short rationale
 \end{itemize}
 
 \textbf{Libraries / tools:}
 \begin{itemize}
-  \item Data handling: Python, pandas, numpy
-  \item Modelling: PyTorch or TensorFlow / Hugging Face Transformers / scikit-learn / XGBoost
-  \item NLP tools (if text): spaCy, NLTK, Hugging Face Datasets
-  \item Web collection: requests, BeautifulSoup, Selenium (if necessary) or official APIs / tweepy
-  \item Experiment tracking: Weights \& Biases / MLflow (optional)
+  \item pandas, numpy, scikit-learn, LightGBM
+  \item transformers, sentence-transformers, torch
+  \item shap, spaCy, pdfminer.six, python-docx
 \end{itemize}
 
 \textbf{Related work / references (2--5 sources):}
-
+\begin{itemize}
+  \item Multi-class text classification with TF-IDF + SVM/GBDT
+  \item BERT fine-tuning for document classification with multi-task heads
+  \item Hierarchical evaluation (family-level correctness when title is ambiguous)
+  \item Industry practices for resume/job normalization using skill dictionaries
+\end{itemize}
 
 \end{document}
