@@ -101,65 +101,44 @@ subset of the test dataset split as mentioned above. We will report results on b
 \end{itemize}
 
 
-\section*{6. Expected dataset size and example datapoints}
-\textbf{Expected size:} 3,500+ resumes total; $\geq$3,200 usable after filtering. \\
-Fine-grained titles: ~60 classes, Occupation families: 23 classes
 
-\textbf{Three example records:} \\[2pt]
-\begin{tabular}{p{0.62\linewidth} p{0.32\linewidth}}
-\toprule
-Text snippet (input) & Label(s) \\
-\midrule
-"...10 yrs software design \& development -- senior Java developer / tech lead at Synnex (2014-Now)... REST APIs, Spring Boot..." & Software Engineer / Computer \& Mathematical \\
-"...enthusiastic Java developer (3 yrs) -- reduced app memory 30\%, startup time 70\%. Roles at DaCoderz \& Quantexx..." & Java Developer / Computer \& Mathematical \\
-"...8 yrs delivering enterprise Java/J2EE solutions; Spring Boot, microservices, AWS; Sr Java Dev @ Fiserv (2021-Now)..." & Software Engineer / Computer \& Mathematical \\
-\bottomrule
-\end{tabular}
-
-\section*{7. Proposed solution}
-\textbf{High-level approach:} Resume $\rightarrow$ preprocessing $\rightarrow$ feature extraction $\rightarrow$ two-head classifier (title + family) $\rightarrow$ evaluation and interpretation
-
-\textbf{Features / inputs:}
-\begin{itemize}
-  \item Text features: normalized text (Experience $\rightarrow$ Skills $\rightarrow$ Summary/Education), TF-IDF vectors, or embeddings (DistilBERT / Sentence-BERT)
-  \item Structured features: section flags, token counts, average bullet length, skill dictionary hits (Python, SQL, AWS, Kubernetes, Terraform)
-\end{itemize}
-
-\textbf{Model candidates:}
-\begin{itemize}
-  \item Baseline: Linear SVM, LightGBM
-  \item Advanced: DistilBERT / Sentence-BERT two-head multi-task classifier
-  \item Handle class imbalance with class weights/focal loss; collapse rare titles into Other
-\end{itemize}
-
-\textbf{Evaluation plan:}
-\begin{itemize}
-  \item Job title: Top-1 / Top-3 accuracy, macro-F1, confusion analysis
-  \item Occupation family: accuracy + hierarchical correctness
-  \item Calibration: Brier score, reliability curves
-  \item Robustness: real-only vs mixed test, short vs long resumes
-  \item Fairness: slices based on resume length and section presence
-\end{itemize}
-
-\textbf{Interpretability:}
-\begin{itemize}
-  \item Baseline: SHAP on n-grams and skill features
-  \item Transformer: token-level attention highlights + short rationale
-\end{itemize}
-
-\textbf{Libraries / tools:}
-\begin{itemize}
-  \item pandas, numpy, scikit-learn, LightGBM
-  \item transformers, sentence-transformers, torch
-  \item shap, spaCy, pdfminer.six, python-docx
-\end{itemize}
-
-\textbf{Related work / references (2--5 sources):}
-\begin{itemize}
-  \item Multi-class text classification with TF-IDF + SVM/GBDT
-  \item BERT fine-tuning for document classification with multi-task heads
-  \item Hierarchical evaluation (family-level correctness when title is ambiguous)
-  \item Industry practices for resume/job normalization using skill dictionaries
-\end{itemize}
+1 Overview
+For the course project, you will gain experience with building a fully functional machine learning ap-
+plication. You get to come up with this project with your teammates, however, this project should
+be non-trivial, and have significant effort in some combination of the data collection techniques,
+modeling approach, and evaluation strategy. You may not directly replicate existing projects.
+2 Proposal
+The first milestone is to complete your project proposal. The format of the proposal will be a PDF
+document which includes the following items:
+1. Team members (2-3 people required)
+2. Task title and overview, including the significance and what makes it challenging
+3. Task definition (type of data, classification/regression/generation, number of classes, single
+label or multi-label)
+4. Describe the problem, it’s impact on the real world, and why it is challenging.
+5. Data source(s) and plan for data collection. This may include how you are going to scrape the
+data and follow terms-of-service, API access and handling rate limiting, using open-source
+data, or any other relevant details. If your data does not have labels, how do you plan to
+get them? If assigning labels by hand, how long does it take per instance? Include links to
+the data if relevant. If you download your dataset from Kaggle, you must include the Kaggle
+link and the original data source link from where the dataset was downloaded and posted on
+Kaggle. Include any meta-data available for your corpus. If you are not collecting it yourself,
+include details about how the data was collected, annotated, preprocessed, etc. Do not work
+on the datasets for which no source information is available. Please indicate whether you will
+use a small subset of the data or features for your project or the entire dataset, and why.
+6. Expected size of the dataset (number of data points) and 3 example data points with labels.
+Your dataset should have at least 1k data points. Some projects will have more or less data.
+7. Proposed solution: How do you plan to go about solving this problem? It is okay to not know
+how the machine learning models work at this point in the class, but you should be starting
+to get some idea based on the lectures and assigned readings. What kind of features and
+target labels do you have? What kind of models might you try? You may not propose simple
+linear regression models for this project. Are there any existing solutions to your problem?
+You must indicate 2-5 sources (research papers, books, machine learning challenges online)
+from where your solution was inspired. Put some thought into how you would approach this.
+How will you know if the model is good? How will you evaluate it? Also, share the libraries
+you intend to use for the project.
+8. A team contract signed by all team members. This is a description of the expectations
+and/or roles that team members agree upon for the semester. Part of your final project grade
+will be based on whether your teammates agree that you followed this contract. See section
+§4 for details.
 
 \end{document}
