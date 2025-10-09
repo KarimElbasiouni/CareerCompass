@@ -1,11 +1,19 @@
 \documentclass[12pt]{article}
-\usepackage[margin=0.8in]{geometry}      % 0.8" margins
+\usepackage[margin=0.8in]{geometry}
 \usepackage{setspace}
-\onehalfspacing                          % 1.5 line spacing
-\usepackage{newtxtext,newtxmath}        % Times-like font (Times New Roman equivalent)
-\usepackage{hyperref}
+\onehalfspacing
+\usepackage{newtxtext,newtxmath}
+\usepackage[dvipsnames]{xcolor} % added for link colors
 \usepackage{array}
 \usepackage{booktabs}
+\usepackage{hyperref}            % keep after xcolor
+\hypersetup{
+  colorlinks=true,
+  linkcolor=MidnightBlue,  % section / internal links
+  urlcolor=RoyalPurple,    % URLs
+  citecolor=BrickRed,      % (if you add citations later)
+  filecolor=OliveGreen
+}
 
 \begin{document}
 
@@ -16,19 +24,19 @@
 
 \section*{1. Team members}
 \begin{itemize}
-  \item Imran Chowdhury — 400470828 — chowdi13@mcmaster.ca
-  \item Member 2: Karim Elbasiouni — email
-  \item Member 3: Rami Abu Sultan — email
+  \item Imran Chowdhury - chowdi13@mcmaster.ca
+  \item Member 2: Karim Elbasiouni — elbasik@mcmaster.ca
+  \item Member 3: Rami Abu Sultan — elbasik@mcmaster.ca
 \end{itemize}
 
 \section*{2. Task title and overview}
-\textbf{Title:} CareerCompass — Resume $\rightarrow$ Job Title \& Occupation Family Classification
+\textbf{Title:} CareerCompass — Resume $\rightarrow$ Job Title \& Occupation Family Classification\\
 
-\textbf{Overview:} Build a system that ingests a resume (PDF/DOCX/TXT or pasted text) and predicts (1) a fine-grained job title (e.g., Software Engineer, Data Analyst) and (2) a coarse occupation family (O*NET/SOC major group, e.g., Computer \& Mathematical Occupations).  
+\textbf{Overview:} Build a system that ingests a resume (PDF/DOCX/TXT or pasted text) and predicts (1) a fine-grained job title (e.g., Software Engineer, Data Analyst) and (2) a coarse occupation family (O*NET/SOC major group, e.g., Computer \& Mathematical Occupations).\\
 
-\textbf{Significance:} Automated routing of candidates improves recruiter efficiency, speeds screening, and enables analytics on talent pools.  
+\textbf{Significance:} Automated routing of candidates improves recruiter efficiency, speeds screening, and enables analytics on talent pools.  \\
 
-\textbf{Challenges:} Resumes are unstructured; titles are noisy; class imbalance; PII must be removed; hierarchical consistency between title and family must be maintained.
+\textbf{Challenges:} Resumes are unstructured; titles are noisy and at times synonymous (SWE vs Software Engineer II vs SDE); class imbalance; PII must be removed; hierarchical consistency between title and family must be maintained.\\
 
 \setlength{\parindent}{0pt}
 
@@ -142,14 +150,40 @@ Potential risks such as residual PII leaking through conversions, alias drift as
 \setlength{\parindent}{15pt}
 
 \section*{5. Data sources and collection plan}
+\textbf{Primary Dataset:} We will use is the Kaggle Resume Dataset called \href{https://www.kaggle.com/datasets/rayyankauchali0/resume-dataset?resource=download}{Resume\_Dataset} by rayyankauchali0 (CC BY 4.0).
+It contains a mixture of real, synthetic and LLM-generated anonymized resumes intended for NLP research and model training. It is inspired by public sources such as \href{https://huggingface.co/collections/ahmedheakl/resumeatlas-668047e86bc332049afd0b39}{ResumeAtlas} and
+\href{https://huggingface.co/datasets/datasetmaster/resumes}{datasetmaster/resumes}, both which are on HuggingFace. The author also indicates that this dataset was preprocessed for anonymization and standardization.
+
+\noindent \textbf{Provenance \& Citation}:  We will cite the Kaggle dataset, including the author, year, URL and License, and the inspirations in SOURCES.md. We will record the download date and the checksum in DATA\_CARD.md.
+
+\noindent \textbf{What will be done with the data?}
+The following outlines the procedures we will take:
+\begin{enumerate}
+  \item Download dataset and record the download date and the checksum
+  \item Load data and perform filter out any rows that do not have the required fields (i.e. "Experience", "Education", "Summary", "Skills")
+  \item Although the author says the data is already anonymized, we will run a PII safeguard and replace any names, emails, or phone numbers with a placeholder. We will record scrubbing procedure on DATA\_CARD.md so anyone can rerun it.
+  \item We will construct the following labels:
+  \begin{enumerate}
+    \item \textbf{Title:} Use the current/most recent job title, and normalize any aliases (Example: SDE II becomes Software Engineer). Any rare titles will be collapsed into \textbf{Other}.
+    \item \textbf{Family:} Map each normalized title its O*NET/SOC 2-digit major group (23 classes total) via a lookup table.
+    \item \textbf{Manual Checks:} Manually check a representative sample of resumes to ensure that the automated labelling pipeline behaves as expected. Sample can be about 100 resumes.
+  \end{enumerate}
+  \item We will create train/validation/test splits grouped by role cluster and source type (real,synthetic, LLM-generated etc.). From the test dataset split, we create a test subset containing only real resumes. As of now,
+  data split will be 80/10/10 respectively.
+  \item We will not be scraping any data or calling any APIs. All of the data would be local according to our current understanding.
+\end{enumerate}
+
+\textbf{Note:} We plan on using the entiretly of the dataset (minus any filtered out data entries). All three splits (training, validation, test) will contain mixed data, and we will have a real-only
+subset of the test dataset split as mentioned above. We will report results on both the mixed and real-only test sets and compare how our model performs.\\
+\textbf{DATA\_CARD.md Metadata:}
 \begin{itemize}
-  \item Primary dataset: Kaggle Resume Dataset by \href{https://www.kaggle.com/datasets/rayyankauchali0/resume-dataset?resource=download}{rayyankauchali0} (CC BY 4.0)
-  \item Mixture of real and synthetic anonymized resumes; inspired by ResumeAtlas (HuggingFace) and datasetmaster/resumes
-  \item Preprocessing: PDF/DOCX $\rightarrow$ text, remove PII, normalize titles
-  \item Label construction: most recent experience title, alias normalization, map to SOC family
-  \item Train/validation/test splits stratified by role and source type; held-out real-only test set
-  \item Metadata: rows by source, class counts, section presence, token length distributions
+  \item Download date and Checksum
+  \item Total number of entries and total number of entries per source type
+  \item PII scrub procedure
+  \item List of title classes with counts
+  \item Link to the title -> family lookup table
 \end{itemize}
+
 
 \section*{6. Expected dataset size and example datapoints}
 \textbf{Expected size:} 3,500+ resumes total; $\geq$3,200 usable after filtering. \\
