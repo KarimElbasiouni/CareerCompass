@@ -38,32 +38,116 @@
 
 \noindent\textbf{Challenges:} Resumes are unstructured; titles are noisy and at times synonymous (SWE vs Software Engineer II vs SDE); class imbalance; PII must be removed; hierarchical consistency between title and family must be maintained.
 
+\setlength{\parindent}{0pt}
+
 \section*{3. Task definition}
-\noindent The project applies supervised learning to de-identified resume text converted from PDF or DOCX files, using sections such as Summary, Experience, Skills, and Education. Each resume is lightly structured through derived features that record section presence and token length, while all personally identifiable information (names, emails, addresses, phone numbers) is removed before storage.
+\subsection*{3.1 Data Type (what the model sees)}
+The model operates primarily on de-identified resume text consolidated from the Summary, Experience, Skills, and Education sections after converting PDF or DOCX files to text. It supplements this corpus with derived auxiliary features such as section presence flags, token counts, simple skill-dictionary hits (e.g., Python, SQL, AWS), and basic length statistics while removing names, emails, phone numbers, addresses, and other obvious contact tokens before any storage or logging.
 
 \medskip
 
-\noindent This dataset supports two related single-label classification tasks. The first predicts a fine-grained job title from approximately 25--30 normalized classes derived from 36 original categories (e.g., Java Developer, Data Scientist, Business Analyst). Rare or duplicate titles are merged into an Other class to reduce imbalance. The second predicts a coarse occupation family across five to seven O*NET/SOC major groups such as Computer \& Mathematical, Management, and Business Operations. Only families present in the data are used for training and evaluation.
+\subsection*{3.2 Observed Label Space}
+Fine-grained titles span 36 distinct categories that include roles such as Java Developer, Data Science, DevOps, Business Analyst, Product Manager, Technical Writer, SRE, and Engineering Manager. Counts are skewed, with several titles represented by 150--200 examples while roughly a dozen classes have fewer than 60, so alias normalization is required to keep the space tractable.
 
 \medskip
 
-\noindent The model employs a shared encoder with two output heads---one for title and one for family---so that fine-grained predictions remain consistent with higher-level occupational categories. This formulation preserves interpretability, handles label noise, and maintains hierarchical structure.
+Coarse occupation families align the titles to SOC/O*NET major groups with realistic coverage of five to seven families in this corpus, primarily Computer \& Mathematical along with Management, Business/Operations, Media/Communications, and a short tail. The full SOC major-group set remains available, but training and evaluation focus on families present in the data to avoid empty classes.
+
+\medskip
+
+\subsection*{3.3 Learning Setup}
+The model architecture follows a two-head single-label classification design that leverages a shared encoder.
+\begin{enumerate}
+  \item Head A: Job Title operates as a single-label, multi-class classifier targeting approximately 25--30 cleaned classes after alias-normalizing near duplicates (e.g., SWE, SDE II, Senior Java Developer mapped to Software Engineer) and collapsing ultra-rare labels with fewer than 40--60 samples into an Other or parent bucket to manage imbalance and evaluation noise.
+  \item Head B: Occupation Family provides single-label, multi-class predictions across the five to seven observed families, combining direct supervision on family labels with a consistency constraint enforced through the title-to-family mapping table.
+\end{enumerate}
+
+\medskip
+
+\subsection*{3.4 Model I/O}
+\begin{enumerate}
+  \item \textit{Input} describes normalized resume text alongside the minimal derived features that capture structural cues.
+  \item \textit{Output} returns title probabilities over $K\approx25$--$30$ classes (Top-1 and Top-3) and family probabilities over $F = 5$--$7$ families (Top-1 with $\sim$5--$7$ families) together with rationale highlights such as ``Python, REST, AWS, CI/CD''.
+  \item \textit{Interfaces} support batch CSV processing and a REST \texttt{/predict} endpoint that produces \{\texttt{title\_top1}, \texttt{title\_top3}, \texttt{family}, \texttt{confidences}, \texttt{reasons[]}\}.
+\end{enumerate}
+
+\medskip
+
+\subsection*{3.5 Why Two Heads (and not one label)}
+Predicting both title and family improves robustness because the fine-grained title space is noisy while the family space is coarser and more stable, enables hierarchical checks by flagging disagreements between the predicted title and family, and strengthens intern or new-grad routing where the family often drives track selection while the title provides the display string.
+
+\medskip
+
+\subsection*{3.6 Evaluation Protocol}
+\begin{enumerate}
+  \item Title head metrics report Top-1 and Top-3 accuracy alongside macro-F1 to respect long-tail classes and confusion reviews among neighboring titles.
+  \item Family head metrics track accuracy and hierarchical correctness to credit predictions that land in the right family when title classification misses.
+  \item Calibration uses the Brier score and reliability curves to determine confidence thresholds for triage.
+  \item Splits follow stratified train, validation, and test partitions with a held-out slice emphasizing resumes that look ``real-style'' rather than synthetic to assess generalization.
+  \item Ablations compare text-only versus text-plus-auxiliary inputs, SVM or GBDT baselines versus DistilBERT or SBERT encoders, and configurations with or without tail collapse.
+\end{enumerate}
+
+\medskip
+
+\subsection*{3.7 Planned Models}
+The initial baseline relies on TF-IDF uni- and bi-gram features that feed Linear SVM and LightGBM classifiers for each head, providing a fast and dependable starting point while class weights or focal loss handle imbalance.
+
+In the upgraded configuration, a DistilBERT or Sentence-BERT encoder shares representations across the two classifier heads and applies class weighting or focal loss to manage skew while improving accuracy and robustness.
+
+\medskip
 
 \section*{4. Problem, impact, and challenges}
-\subsection*{Problem Statement}
-Automatically map unstructured resume text to a consistent job title and occupation family.
+\subsection*{4.1 Problem Statement}
+The objective is to automatically map messy, free-form resumes to clear job titles and recruiting families.
 
 \medskip
 
-\subsection*{Real-World Impact}
-Large campus and new-graduate hiring cycles can produce thousands of resumes within days, so automating the first-pass routing to tracks like Software, Data/ML, or Business Analysis reduces manual screening time and improves reviewer consistency. Interpretable rationale outputs help students and recruiters understand the skill signals driving each prediction while privacy safeguards remove PII throughout the pipeline.
+\subsection*{4.2 Real-World Impact}
+First, high-volume funnels such as campus and new-grad intakes generate thousands of resumes within days, so a reliable classifier routes candidates to Software, Data/ML, Cloud/DevOps, or Product/Business Analyst tracks and trims manual triage time.
 
 \medskip
 
-\subsection*{Why It’s Challenging (and how it’s addressed)}
-Resumes are unstructured, redundant, and imbalanced, which calls for robust text normalization, transformer-based representations, and deliberate handling of noisy formats. Title labels overlap across aliases (for example, SWE, SDE, Backend Engineer), so the system applies alias normalization and collapses rare classes. Class imbalance and hierarchical consistency are managed with weighted losses and the two-head design that links title and family predictions.
+Additionally, early-career resumes are short and stylistically uneven, so consistent predictions reduce reviewer fatigue and guard against missed signals such as projects or skills that could otherwise slip past subjective screens.
 
 \medskip
+
+Furthermore, token and skill-level rationales explain routing decisions—for example, ``Python, SQL, Power BI'' pointing to the Data Analyst family—so students receive faster feedback that guides coursework and project choices.
+
+\medskip
+
+Finally, family labels enable pipeline analytics that report on track health, skill coverage, and background diversity while keeping personally identifiable information scrubbed.
+
+\medskip
+
+\subsection*{4.3 Why It's Challenging (and How Our Design Addresses It)}
+The task is challenging because resumes are unstructured, ambiguous, and imbalanced, requiring deliberate architectural and data-handling choices.
+\begin{enumerate}
+  \item Unstructured noisy text from multi-column PDFs and mixed formatting demands robust normalization, section-aware concatenation, and a transformer upgrade once the baselines stabilize.
+  \item Synonymy and near duplicates such as SWE versus SDE or Backend with seniority suffixes require alias normalization, tail collapse, and Top-3 evaluation to capture realistic ambiguity.
+  \item Long-tail class imbalance with roles represented by fewer than 60 examples calls for class weights or focal loss, the collapse strategy, and macro-F1 reporting.
+  \item Hierarchy consistency between title and family depends on the two-head model backed by mapping checks and conflict flags that prompt human review.
+  \item Privacy and fairness guardrails rely on PII scrubbing, exclusion of protected features, and slice metrics based on neutral proxies like resume length and section presence.
+\end{enumerate}
+
+\medskip
+
+\subsection*{4.4 Justification}
+Starting from 36 observed titles, the pipeline normalizes aliases, merges seniority variants, and targets $K\approx25$--$30$ classes so that granularity remains useful while approaching at least 60 examples per class whenever feasible. This collapse improves evaluations and supports defensible handling of sparse categories.
+
+\medskip
+
+The family space naturally populates five to seven SOC major groups, and training or evaluation is restricted to the families present in the dataset while keeping the mapping extensible for future data additions. This approach retains alignment with SOC definitions without forcing empty targets.
+
+\medskip
+
+Hierarchical agreement is enforced by mapping each predicted title to its family and comparing the result with the family head; any disagreements trigger a conflict flag and default routing to the family prediction for safer handling of intern and new-grad workflows.
+
+\medskip
+
+\subsection*{4.5 Risk and Mitigation}
+Potential risks such as residual PII leaking through conversions, alias drift as new titles appear, label noise from weak supervision, class imbalance collapsing minority roles, overfitting to synthetic resumes, and opaque predictions are mitigated through automated scrubbing with spot audits, periodic alias-table reviews driven by active learning alerts, human-in-the-loop inspections of small cohorts each sprint, class-weighted or focal losses with tail buckets monitored via macro-F1, held-out ``real-style'' test slices with periodic shadow evaluation on fresh uploads, and reviewer-facing rationale logs that highlight key skills.
+
+\setlength{\parindent}{15pt}
 
 \section*{5. Data sources and collection plan}
 \textbf{Primary Dataset:} We will use is the Kaggle Resume Dataset called \href{https://www.kaggle.com/datasets/rayyankauchali0/resume-dataset?resource=download}{Resume\_Dataset} by rayyankauchali0 (CC BY 4.0).
@@ -100,45 +184,68 @@ subset of the test dataset split as mentioned above. We will report results on b
   \item Link to the title -> family lookup table
 \end{itemize}
 
+\section*{6. Expected size of the dataset and 3 example data points with labels}
+
+\noindent \textbf{Planned Dataset Size:}  
+3,500+ resumes total; ≥3,200 usable after minor filtering (empty Experience, malformed records). Approximately 60 normalized title classes; 23 occupation families.
+
+\medskip
+\noindent \textbf{Three Example (Illustrative) Records:}
+
+\begin{center}
+\begin{tabular}{|p{2.5cm}|p{5.5cm}|p{3.5cm}|p{3.5cm}|}
+\hline
+\textbf{Resume ID} & \textbf{Text Snippet} & \textbf{Title} & \textbf{Family} \\
+\hline
+REAL\_0001 & ``...10 yrs software design \& development — senior Java developer / tech lead at Synnex (2014-Now)... REST APIs, Spring Boot...'' & Software Engineer & 15 – Computer \& Mathematical \\
+REAL\_0002 & ``...enthusiastic Java developer (3 yrs) — reduced app memory 30\%, startup time 70\%. Roles at DaCoderz \& Quantexx...'' & Java Developer → collapsed to Software Engineer & 15 – Computer \& Mathematical \\
+REAL\_0003 & ``...8 yrs delivering enterprise Java/J2EE solutions; Spring Boot, microservices, AWS; Sr Java Dev @ Fiserv (2021-Now)...'' & Senior Java Developer → collapsed to Software Engineer & 15 – Computer \& Mathematical \\
+\hline
+\end{tabular}
+\end{center}
+\caption{Example Data Points from the Dataset}
 
 
-1 Overview
-For the course project, you will gain experience with building a fully functional machine learning ap-
-plication. You get to come up with this project with your teammates, however, this project should
-be non-trivial, and have significant effort in some combination of the data collection techniques,
-modeling approach, and evaluation strategy. You may not directly replicate existing projects.
-2 Proposal
-The first milestone is to complete your project proposal. The format of the proposal will be a PDF
-document which includes the following items:
-1. Team members (2-3 people required)
-2. Task title and overview, including the significance and what makes it challenging
-3. Task definition (type of data, classification/regression/generation, number of classes, single
-label or multi-label)
-4. Describe the problem, it’s impact on the real world, and why it is challenging.
-5. Data source(s) and plan for data collection. This may include how you are going to scrape the
-data and follow terms-of-service, API access and handling rate limiting, using open-source
-data, or any other relevant details. If your data does not have labels, how do you plan to
-get them? If assigning labels by hand, how long does it take per instance? Include links to
-the data if relevant. If you download your dataset from Kaggle, you must include the Kaggle
-link and the original data source link from where the dataset was downloaded and posted on
-Kaggle. Include any meta-data available for your corpus. If you are not collecting it yourself,
-include details about how the data was collected, annotated, preprocessed, etc. Do not work
-on the datasets for which no source information is available. Please indicate whether you will
-use a small subset of the data or features for your project or the entire dataset, and why.
-6. Expected size of the dataset (number of data points) and 3 example data points with labels.
-Your dataset should have at least 1k data points. Some projects will have more or less data.
-7. Proposed solution: How do you plan to go about solving this problem? It is okay to not know
-how the machine learning models work at this point in the class, but you should be starting
-to get some idea based on the lectures and assigned readings. What kind of features and
-target labels do you have? What kind of models might you try? You may not propose simple
-linear regression models for this project. Are there any existing solutions to your problem?
-You must indicate 2-5 sources (research papers, books, machine learning challenges online)
-from where your solution was inspired. Put some thought into how you would approach this.
-How will you know if the model is good? How will you evaluate it? Also, share the libraries
-you intend to use for the project.
-8. A team contract signed by all team members. This is a description of the expectations
-and/or roles that team members agree upon for the semester. Part of your final project grade
-will be based on whether your teammates agree that you followed this contract. See section
-§4 for details.
+\section*{7. Proposed Solution}
+
+\noindent \textbf{High-level Approach:}  
+We plan to process resumes through text feature extraction, convert them into vector representations using TF-IDF, and use a \textbf{Linear SVM} as the baseline model for job title and occupation family classification. This baseline will help us establish performance metrics to benchmark against more advanced models.
+
+\medskip
+\noindent \textbf{Features / Inputs:}  
+- \textbf{Text Features}:  
+    - We will use \textbf{TF-IDF} to vectorize the resumes. This method captures important words in each resume, converting raw text data into numeric vectors suitable for machine learning models.
+    - Additional features may include skill dictionary matches (e.g., Python, SQL, AWS), resume section presence (Summary, Experience, etc.), token counts, and average bullet length.
+    
+- \textbf{Target Labels}:  
+    - \textbf{Job Title}: Fine-grained classification (e.g., Software Engineer, Data Scientist).
+    - \textbf{Occupation Family}: Coarse classification (e.g., Computer \& Mathematical, Business Operations).
+
+\medskip
+\noindent \textbf{Baseline Model:}  
+- \textbf{Linear SVM}: We will begin with a simple \textbf{Linear SVM} for both job title and occupation family classification. The model will be trained using TF-IDF vectors as features. This approach will establish baseline performance metrics (accuracy, F1 score) for evaluating future improvements.
+
+\medskip
+\noindent \textbf{Main Model:}  
+- \textbf{DistilBERT Fine-Tuning}: After establishing baseline performance, we will fine-tune \textbf{DistilBERT} (a smaller, efficient version of BERT) to learn contextual relationships between words in resumes. This model will be evaluated using the same performance metrics, with the goal of outperforming the baseline \textbf{Linear SVM}.
+
+\medskip
+\noindent \textbf{Evaluation Plan:}  
+- We will evaluate the models using \textbf{Top-1 accuracy} and \textbf{macro-F1 score} to handle class imbalance and ensure robust performance across all categories.
+- We will also analyze the \textbf{confusion matrix} to identify where the model confuses similar job titles or occupation families.
+  
+\medskip
+\noindent \textbf{Libraries / Tools:}  
+- \textbf{scikit-learn} for TF-IDF vectorization and SVM implementation.
+- \textbf{transformers} and \textbf{torch} for fine-tuning DistilBERT.
+- \textbf{pandas} and \textbf{numpy} for data manipulation.
+
+\medskip
+\noindent \textbf{Existing Solutions / References:}  
+- \textbf{BERT-based Models for Resume Classification}: Research shows BERT-based models excel at understanding context and improving classification performance on complex text tasks (e.g., [Devlin et al., 2019]).
+- \textbf{Multi-class Text Classification}: Previous work has used models like SVM with TF-IDF for text classification tasks, including document categorization (e.g., [Joachims, 1998]).
+- \textbf{Hierarchical Classification for Job Titles}: Several approaches explore hierarchical relationships in job title classification (e.g., [Vaswani et al., 2017]).
+
+
 
 \end{document}
