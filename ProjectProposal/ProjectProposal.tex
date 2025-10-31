@@ -60,7 +60,7 @@ Large campus and new-graduate hiring cycles can produce thousands of resumes wit
 
 \medskip
 
-\subsection*{Why It’s Challenging (and how it’s addressed)}
+\subsection*{Why It's Challenging (and how it's addressed)}
 Resumes are unstructured, redundant, and imbalanced, which calls for robust text normalization, transformer-based representations, and deliberate handling of noisy formats. Title labels overlap across aliases (for example, SWE, SDE, Backend Engineer), so the system applies alias normalization and collapses rare classes. Class imbalance and hierarchical consistency are managed with weighted losses and the two-head design that links title and family predictions.
 
 \medskip
@@ -100,45 +100,64 @@ subset of the test dataset split as mentioned above. We will report results on b
   \item Link to the title -> family lookup table
 \end{itemize}
 
-
-
-1 Overview
-For the course project, you will gain experience with building a fully functional machine learning ap-
-plication. You get to come up with this project with your teammates, however, this project should
-be non-trivial, and have significant effort in some combination of the data collection techniques,
-modeling approach, and evaluation strategy. You may not directly replicate existing projects.
-2 Proposal
-The first milestone is to complete your project proposal. The format of the proposal will be a PDF
-document which includes the following items:
-1. Team members (2-3 people required)
-2. Task title and overview, including the significance and what makes it challenging
-3. Task definition (type of data, classification/regression/generation, number of classes, single
-label or multi-label)
-4. Describe the problem, it’s impact on the real world, and why it is challenging.
-5. Data source(s) and plan for data collection. This may include how you are going to scrape the
-data and follow terms-of-service, API access and handling rate limiting, using open-source
-data, or any other relevant details. If your data does not have labels, how do you plan to
-get them? If assigning labels by hand, how long does it take per instance? Include links to
-the data if relevant. If you download your dataset from Kaggle, you must include the Kaggle
-link and the original data source link from where the dataset was downloaded and posted on
-Kaggle. Include any meta-data available for your corpus. If you are not collecting it yourself,
-include details about how the data was collected, annotated, preprocessed, etc. Do not work
-on the datasets for which no source information is available. Please indicate whether you will
-use a small subset of the data or features for your project or the entire dataset, and why.
-6. Expected size of the dataset (number of data points) and 3 example data points with labels.
-Your dataset should have at least 1k data points. Some projects will have more or less data.
-7. Proposed solution: How do you plan to go about solving this problem? It is okay to not know
-how the machine learning models work at this point in the class, but you should be starting
-to get some idea based on the lectures and assigned readings. What kind of features and
-target labels do you have? What kind of models might you try? You may not propose simple
-linear regression models for this project. Are there any existing solutions to your problem?
-You must indicate 2-5 sources (research papers, books, machine learning challenges online)
-from where your solution was inspired. Put some thought into how you would approach this.
-How will you know if the model is good? How will you evaluate it? Also, share the libraries
-you intend to use for the project.
-8. A team contract signed by all team members. This is a description of the expectations
-and/or roles that team members agree upon for the semester. Part of your final project grade
-will be based on whether your teammates agree that you followed this contract. See section
+\section*{6. Expected size of the dataset and 3 example data points with labels}
+ 
+\noindent \textbf{Planned Dataset Size:}  
+3,500+ resumes total; $\geq$ 3,200 usable after minor filtering (empty Experience, malformed records). Approximately 60 normalized title classes; 23 occupation families.
+ 
+\medskip
+\noindent \textbf{Three Example (Illustrative) Records:}
+ 
+\begin{center}
+\begin{tabular}{|p{2.5cm}|p{5.5cm}|p{3.5cm}|p{3.5cm}|}
+\hline
+\textbf{Resume ID} & \textbf{Text Snippet} & \textbf{Title} & \textbf{Family} \\
+\hline
+REAL\_0001 & "...10 yrs software design \& development — senior Java developer / tech lead at Synnex (2014-Now)... REST APIs, Spring Boot...'' & Software Engineer & 15 – Computer \& Mathematical \\
+REAL\_0002 & "...enthusiastic Java developer (3 yrs) — reduced app memory 30\%, startup time 70\%. Roles at DaCoderz \& Quantexx...'' & Java Developer → collapsed to Software Engineer & 15 – Computer \& Mathematical \\
+REAL\_0003 & "...8 yrs delivering enterprise Java/J2EE solutions; Spring Boot, microservices, AWS; Sr Java Dev @ Fiserv (2021-Now)...'' & Senior Java Developer → collapsed to Software Engineer & 15 – Computer \& Mathematical \\
+\hline
+\end{tabular}
+\end{center}
+ 
+ 
+\section*{7. Proposed Solution}
+ 
+\noindent \textbf{High-level Approach:}  
+We plan to process resumes through text feature extraction, convert them into vector representations using TF-IDF, and use a \textbf{Linear SVM} as the baseline model for job title and occupation family classification. This baseline will help us establish performance metrics to benchmark against more advanced models.
+ 
+\medskip
+\noindent \textbf{Features / Inputs:}  
+- \textbf{Text Features}:  
+    - We will use \textbf{TF-IDF} to vectorize the resumes. This method captures important words in each resume, converting raw text data into numeric vectors suitable for machine learning models.
+    - Additional features may include skill dictionary matches (e.g., Python, SQL, AWS), resume section presence (Summary, Experience, etc.), token counts, and average bullet length.
+- \textbf{Target Labels}:  
+    - \textbf{Job Title}: Fine-grained classification (e.g., Software Engineer, Data Scientist).
+    - \textbf{Occupation Family}: Coarse classification (e.g., Computer \& Mathematical, Business Operations).
+ 
+\medskip
+\noindent \textbf{Baseline Model:}  
+- \textbf{Linear SVM}: We will begin with a simple \textbf{Linear SVM} for both job title and occupation family classification. The model will be trained using TF-IDF vectors as features. This approach will establish baseline performance metrics (accuracy, F1 score) for evaluating future improvements.
+ 
+\medskip
+\noindent \textbf{Main Model:}  
+- \textbf{DistilBERT Fine-Tuning}: After establishing baseline performance, we will fine-tune \textbf{DistilBERT} (a smaller, efficient version of BERT) to learn contextual relationships between words in resumes. This model will be evaluated using the same performance metrics, with the goal of outperforming the baseline \textbf{Linear SVM}.
+ 
+\medskip
+\noindent \textbf{Evaluation Plan:}  
+- We will evaluate the models using \textbf{Top-1 accuracy} and \textbf{macro-F1 score} to handle class imbalance and ensure robust performance across all categories.
+- We will also analyze the \textbf{confusion matrix} to identify where the model confuses similar job titles or occupation families.
+\medskip
+\noindent \textbf{Libraries / Tools:}  
+- \textbf{scikit-learn} for TF-IDF vectorization and SVM implementation.
+- \textbf{transformers} and \textbf{torch} for fine-tuning DistilBERT.
+- \textbf{pandas} and \textbf{numpy} for data manipulation.
+ 
+\medskip
+\noindent \textbf{Existing Solutions / References:}  
+- \textbf{BERT-based Models for Resume Classification}: Research shows BERT-based models excel at understanding context and improving classification performance on complex text tasks (e.g., [Devlin et al., 2019]).
+- \textbf{Multi-class Text Classification}: Previous work has used models like SVM with TF-IDF for text classification tasks, including document categorization (e.g., [Joachims, 1998]).
+- \textbf{Hierarchical Classification for Job Titles}: Several approaches explore hierarchical relationships in job title classification (e.g., [Vaswani et al., 2017]).
 §4 for details.
 
 \end{document}
