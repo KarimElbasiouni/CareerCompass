@@ -187,23 +187,25 @@ subset of the test dataset split as mentioned above. We will report results on b
 \section*{6. Expected size of the dataset and 3 example data points with labels}
 
 \noindent \textbf{Planned Dataset Size:}  
-3,500+ resumes total; ≥3,200 usable after minor filtering (empty Experience, malformed records). Approximately 60 normalized title classes; 23 occupation families.
+3,500+ resumes total; $\geq$3,200 usable after minor filtering (empty Experience, malformed records). Approximately 60 normalized title classes; 23 occupation families.
 
 \medskip
 \noindent \textbf{Three Example (Illustrative) Records:}
 
-\begin{center}
+\begin{table}[ht]
+\centering
 \begin{tabular}{|p{2.5cm}|p{5.5cm}|p{3.5cm}|p{3.5cm}|}
 \hline
 \textbf{Resume ID} & \textbf{Text Snippet} & \textbf{Title} & \textbf{Family} \\
 \hline
-REAL\_0001 & ``...10 yrs software design \& development — senior Java developer / tech lead at Synnex (2014-Now)... REST APIs, Spring Boot...'' & Software Engineer & 15 – Computer \& Mathematical \\
-REAL\_0002 & ``...enthusiastic Java developer (3 yrs) — reduced app memory 30\%, startup time 70\%. Roles at DaCoderz \& Quantexx...'' & Java Developer → collapsed to Software Engineer & 15 – Computer \& Mathematical \\
-REAL\_0003 & ``...8 yrs delivering enterprise Java/J2EE solutions; Spring Boot, microservices, AWS; Sr Java Dev @ Fiserv (2021-Now)...'' & Senior Java Developer → collapsed to Software Engineer & 15 – Computer \& Mathematical \\
+REAL\_0001 & "...10 yrs software design \& development — senior Java developer / tech lead at Synnex (2014-Now)... REST APIs, Spring Boot..." & Software Engineer & 15 - Computer \& Mathematical \\
+REAL\_0002 & "...enthusiastic Java developer (3 yrs) — reduced app memory 30\%, startup time 70\%. Roles at DaCoderz \& Quantexx..." & Java Developer → collapsed to Software Engineer & 15 - Computer \& Mathematical \\
+REAL\_0003 & "...8 yrs delivering enterprise Java/J2EE solutions; Spring Boot, microservices, AWS; Sr Java Dev @ Fiserv (2021-Now)..." & Senior Java Developer → collapsed to Software Engineer & 15 - Computer \& Mathematical \\
 \hline
 \end{tabular}
-\end{center}
-\caption{Example Data Points from the Dataset}
+\caption{Example Data points from the Dataset}
+\label{tab:example-datapoints}
+\end{table}
 
 
 \section*{7. Proposed Solution}
