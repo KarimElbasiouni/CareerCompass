@@ -14,7 +14,7 @@ Thumbs.db
 
 
 # Machine learning artifacts / models
-models/
+/models/
 *.h5
 *.ckpt
 *.pt
@@ -37,5 +37,9 @@ logs/
 # Misc / OS caches
 .cache/
 
-# ignore processed data
+# ignore generated artifacts
+.venv/
+__pycache__/
 data/processed/
+data/features/
+runs/
