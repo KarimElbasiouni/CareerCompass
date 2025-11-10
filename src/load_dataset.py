@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+from pathlib import Path
 from src.config import RAW_JSONL_PATH
 
 def load_jsonl_dataset(path: str | os.PathLike = None) -> pd.DataFrame:
