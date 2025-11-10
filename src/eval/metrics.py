@@ -17,34 +17,55 @@ def macro_f1(y_true, y_pred) -> float:
     return float(f1_score(y_true, y_pred, average="macro")) if len(y_true) else 0.0
 
 
-def confusion(y_true, y_pred, labels, display_labels=None) -> tuple[np.ndarray, plt.Figure]:
+def confusion(y_true, y_pred, labels, display_labels=None, scale: float = 1.25) -> tuple[np.ndarray, plt.Figure]:
+    """
+    Bigger confusion matrix:
+    - scale: multiplies base side length
+    - shows count + row %
+    """
     cm = confusion_matrix(y_true, y_pred, labels=labels)
+    n_classes = len(labels)
     tick_labels = display_labels if display_labels is not None else labels
-    fig, ax = plt.subplots(figsize=(6, 6))
+
+    base_side = max(6, min(1.0 * n_classes, 14))
+    side = base_side * scale
+    fig, ax = plt.subplots(figsize=(side, side), dpi=150)
+
     im = ax.imshow(cm, interpolation="nearest", cmap="Blues")
-    ax.figure.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    cbar = ax.figure.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    cbar.ax.set_ylabel("Count", rotation=270, labelpad=15, fontsize=12)
+
     ax.set(
-        xticks=np.arange(len(labels)),
-        yticks=np.arange(len(labels)),
+        xticks=np.arange(n_classes),
+        yticks=np.arange(n_classes),
         xticklabels=tick_labels,
         yticklabels=tick_labels,
         ylabel="True label",
         xlabel="Predicted label",
-        title="Confusion matrix",
+        title="Confusion Matrix (count / row%)",
     )
-    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
-    thresh = cm.max() / 2 if cm.size else 0
-    for i in range(cm.shape[0]):
-        for j in range(cm.shape[1]):
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor", fontsize=10)
+    plt.setp(ax.get_yticklabels(), fontsize=10)
+
+    row_sums = cm.sum(axis=1, keepdims=True)
+    max_val = cm.max()
+    for i in range(n_classes):
+        for j in range(n_classes):
+            count = cm[i, j]
+            pct = (100.0 * count / row_sums[i, 0]) if row_sums[i, 0] else 0.0
+            txt = f"{count}\n{pct:.1f}%"
             ax.text(
                 j,
                 i,
-                format(cm[i, j], "d"),
+                txt,
                 ha="center",
                 va="center",
-                color="white" if cm[i, j] > thresh else "black",
-                fontsize=8,
+                color="white" if count > 0.55 * max_val else "black",
+                fontsize=9 + (0.3 * scale),
             )
+
+    ax.tick_params(length=0)
+    ax.grid(False)
     fig.tight_layout()
     return cm, fig
 
