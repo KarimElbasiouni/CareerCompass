@@ -36,3 +36,9 @@ logs/
 
 # Misc / OS caches
 .cache/
+
+# Local environments & derived data
+.venv/
+__pycache__/
+data/processed/
+data/features/
