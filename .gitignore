@@ -36,3 +36,6 @@ logs/
 
 # Misc / OS caches
 .cache/
+
+# ignore processed data
+data/processed/
