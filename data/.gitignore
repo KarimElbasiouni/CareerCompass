@@ -1,0 +1,3 @@
+*.parquet
+*.joblib
+*.npz
