@@ -82,113 +82,75 @@ Our approach draws on both older and newer ideas in text classification. Earlier
 
 In recent years, researchers have shifted toward models that capture meaning rather than just word frequency. A notable example is JobBERT introduced by \citet{Decorte2021JobBERT}, a transformer-based model designed to capture how job titles and skills are related. \citet{Liu2022Title2Vec} developed Title2Vec, which maps job titles into a shared numerical space so that similar roles can be grouped and compared more easily. Large pretrained models like BERT \citep{Devlin2019BERT} have proven effective at understanding general language and can be adapted to domains such as career analytics, where wording and phrasing vary across resumes.
 
-These studies helped guide how we approached CareerCompass. The early works gave us a solid foundation to begin our baseline model, and the newer methods discovered in recent years pointed us towards experimenting with fine-tuned BERT models to capture the subtle phrasing differences that can occur and better link resume text with standardized job titles.
+These studies helped guide how we approached CareerCompass. The early works gave us a solid foundation to begin our baseline model, and the newer methods discovered in recent years pointed us towards experimenting with fine-tuned BERT models to capture the subtle phrasing differences that can occur and better link resume text with standardised job titles.
 
 \section{Dataset}
 
-We use the publicly available Kaggle Resume Dataset by Rayyan Kauchali (2020; CC BY 4.0) \citep{Kauchali2020Resume} consisting of a mix of real and synthetic/anonymized resumes intended for NLP research. Each record includes structured text sections such as Summary, Skills, Experience, and Education, plus a noisy title-like category field (Category). Raw files are placed under \texttt{data/raw/}, and all preprocessing is orchestrated by \texttt{build\_clean\_dataset.py}.
+We use the publicly available Kaggle Resume Dataset by Rayyan Kauchali (2020; CC BY 4.0) \citep{Kauchali2020Resume} consisting of a mix of real and synthetic/anonymised resumes intended for NLP research. Each record includes structured text sections such as Summary, Skills, Experience, and Education, plus a noisy title-like category field (Category). Raw files are placed under \texttt{data/raw/}, and all preprocessing is orchestrated by \texttt{build\_clean\_dataset.py}.
 
-Following our data plan, we applied a lightweight PII safeguard by redacting emails and phone numbers with deterministic regular expressions, then concatenated the key sections into a unified text field (\texttt{text\_clean}) and normalized it to \texttt{text\_norm}. Rows missing all major sections are dropped. This pipeline is reproducible via \texttt{build\_clean\_dataset.py} and supporting utilities (\texttt{src/data\_filter.py} and \texttt{src/text\_processing.py}), which write the canonical processed corpus to \texttt{data/processed/resumes\_v1.parquet} (and a CSV fallback).
+Following our data plan, we applied a lightweight PII safeguard by redacting emails and phone numbers with deterministic regular expressions, then concatenated the key sections into a unified text field (\texttt{text\_clean}) and normalised it to \texttt{text\_norm}. Rows missing all major sections are dropped. This pipeline is reproducible via \texttt{build\_clean\_dataset.py} and supporting utilities (\texttt{src/data\_filter.py} and \texttt{src/text\_processing.py}), which write the canonical processed corpus to \texttt{data/processed/resumes\_v1.parquet} (and a CSV fallback).
 
-Label construction follows our proposal and current implementation: raw titles from \texttt{Category} are normalized via a curated alias map into canonical titles (\texttt{title\_raw}), and each canonical title is mapped to a coarse occupation family (\texttt{y\_family}) using a lookup table (e.g., "Computers / IT", "Business / Finance"). This family mapping is conceptually aligned with SOC major groups, and unmapped or rare titles are assigned to \texttt{Other} to mitigate class imbalance.
+Label construction follows our proposal and current implementation: raw titles from \texttt{Category} are normalised via a curated alias map into canonical titles (\texttt{title\_raw}), and each canonical title is mapped to a coarse occupation family (\texttt{y\_family}) using a lookup table (e.g., "Computers / IT", "Business / Finance"). This family mapping is conceptually aligned with SOC major groups, and unmapped or rare titles are assigned to \texttt{Other} to mitigate class imbalance.
 
 Each record is assigned a stable \texttt{resume\_id} to support joins and splits. The processed dataset, exported in Parquet and CSV, serves as the single source for downstream feature extraction (TF-IDF) and supervised learning for two tasks: fine-grained job-title classification and coarse occupation family classification.
 
 \section{Features}
 
-Describe any features you used for your model, or how your data was input to your model. Are you doing feature engineering or feature selection? Are you learning embeddings? Is it all part of one neural network? Refer to item 2. This may range from 0.25 pages to 0.5 pages.
+Each resume was represented as a normalised text document derived by concatenating its major sections (Summary, Experience, Skills, and Education) after removing personal identifiers, converting all text to lowercase, and tokenising the content. The resulting corpus was transformed into a bag-of-words representation using TF-IDF weighting, which encodes term importance by balancing local frequency against global rarity. Both unigrams and bigrams were included to capture short professional phrases while maintaining the independence assumptions of classical vector-space models. Tokens appearing in fewer than 3 resumes or in more than 90\% of documents were removed to reduce high-variance rare features and low-information common words, minimising overfitting and improving generalisation. The vectoriser was trained only on the training subset to avoid data leakage, and no further feature selection or augmentation was applied beyond the statistical weighting inherent in TF-IDF. This high-dimensional sparse matrix, about 80{,}000 features across 3{,}500 samples, serves as the fixed input for the baseline classifiers evaluated in the next section.
 
 \section{Implementation}
 
-Describe your model and implementation here. Refer to item 4. This may take around a page.
+Our current pipeline implements two baselines for resume-to-title classification: a majority-class heuristic and a Linear Support Vector Classifier (LinearSVC) trained on TF--IDF features. The majority model always predicts the most frequent training label, establishing a lower-bound accuracy of 0.057. The LinearSVC replaces this with a margin-based learner that separates classes in the high-dimensional TF--IDF space while remaining lightweight and interpretable. Training uses the pre-split data (80 / 10 / 10) generated by the cleaning pipeline, ensuring reproducibility across runs.
+
+The LinearSVC optimises the soft-margin hinge-loss objective
+\begin{equation}
+  \label{eq:linear_svc_objective}
+  \min_{\mathbf{w}, b} \lambda \left\| \mathbf{w} \right\|_2^2 + \frac{1}{N} \sum_{i=1}^{N} \max \bigl(0, 1 - y_i (\mathbf{w} \cdot \mathbf{x}_i + b) \bigr),
+\end{equation}
+which penalises misclassified points outside the margin while regularising model weights. In practice, the scikit-learn implementation expresses \(\lambda\) as \(1 / C\); we tuned \(C \in \{0.25, 0.5, 1.0, 2.0\}\) and found \(C = 2.0\) delivered the best validation results. Optimisation relies on coordinate-descent (LibLinear), a deterministic convex solver that efficiently updates each parameter to minimise the global loss. Class weighting compensates for mild imbalance among the thirty-six labels.
+
+Training artifacts (vectorizer, encoded labels, model weights, and confusion matrices) are automatically logged under \texttt{models/} and \texttt{runs/}. The LinearSVC baseline achieves validation accuracy 0.900 (macro-F1 0.936) and test accuracy 0.886 (macro-F1 0.924), confirming that the implementation functions correctly and substantially exceeds the majority baseline.
+
+The primary limitation of this setup is its reliance on lexical features: semantically similar phrases may be treated as unrelated, and the model produces uncalibrated decision margins rather than probabilities. These constraints motivate the next step, introducing a BERT-based contextual encoder fine-tuned with a softmax output and cross-entropy loss, optimised via AdamW. This comparison will reveal whether richer semantic representations improve generalisation beyond the classical linear baseline.
 
 \section{Results and Evaluation}
 
-How are you evaluating your model? What results do you have so far? What are your baselines? Refer to item 5. This may take around 0.5 pages.
+The evaluation followed a standardised 80 / 10 / 10 stratified train, validation, and test split across 3{,}500 resumes representing 36 canonical job titles. Splits were fixed by random seed to ensure reproducibility and balanced class distribution. All TF-IDF features (1--2 grams, min\_df = 3, max\_df = 0.9) were fit on the training subset only, preventing data leakage, and corresponding label encodings were regenerated consistently across runs.
+
+Model performance was assessed with accuracy, macro-averaged F1, and Top-\(k\) accuracy (\(k \in \{1, 3\}\)), consistent with our established evaluation framework. Accuracy captures overall correctness, while macro-F1 balances precision and recall across labels, countering the bias of frequent classes. Top-\(k\) accuracy quantifies the proportion of resumes for which the correct title appears within the \(k\) highest-scoring predictions, which is useful when semantically close occupations are interchangeable in context.
+
+The majority-class baseline, which always predicts the most common training title, reached only 0.057 accuracy and 0.003 macro-F1 on both validation and test splits, establishing a lower bound for comparison. By contrast, the Linear SVC trained on TF-IDF features achieved 0.900 validation accuracy (macro-F1 0.936) and 0.886 test accuracy (macro-F1 0.924) with \(C = 2.0\), while Top-3 accuracy exceeded 0.97 on both splits. The close alignment of validation and test results indicates good generalisation and minimal overfitting. The corresponding confusion matrices in Figures~\ref{fig:confusion-val} and \ref{fig:confusion-test} confirm this trend: strong diagonal dominance indicates high per-class accuracy, while small off-diagonal clusters highlight overlap between related titles such as \emph{Python Developer} and \emph{Data Science}.
+
+\begin{center}
+\refstepcounter{figure}
+\includegraphics[width=\columnwidth]{../../runs/svm_tfidf/confusion_val.png}\\
+{\small \textbf{Figure \thefigure:} Confusion matrix on the validation set showing class-wise prediction counts and normalised row percentages for the Linear SVC baseline.}
+\label{fig:confusion-val}
+\end{center}
+
+Per-class inspection revealed that smaller categories, including \emph{React Developer}, \emph{Python Developer}, \emph{SQL Developer}, and \emph{Testing}, had F1 scores in the 0.65--0.75 range, largely due to limited samples and lexical similarity across adjacent roles. These systematic confusions suggest that richer semantic representations or broader data coverage could further improve minority-class performance. Overall, the Linear SVC provides a robust and interpretable baseline that meets the project's quantitative evaluation requirements. Future transformer-based or probability-calibrated models will be compared against this same split and metric configuration to ensure fair benchmarking.
+
+\begin{center}
+\refstepcounter{figure}
+\includegraphics[width=\columnwidth]{../../runs/svm_tfidf/confusion_test.png}\\
+{\small \textbf{Figure \thefigure:} Confusion matrix on the test set illustrating consistent performance across splits and limited confusion between related job titles.}
+\label{fig:confusion-test}
+\end{center}
+
 
 \section{Feedback and Plans}
 
-Write about your plans for the remainder of the project. This should include a discussion of the feedback you received from your TA, and how you plan to improve your approach. Reflect on your implementation and areas for improvement. Refer to item 6. This may be around 0.5 pages.
+Our TA's primary feedback emphasised the need for clearer and more varied visualisations of results, suggesting the addition of summary graphs or alternative plots beyond the confusion matrix to make class-level performance easier to interpret. This aligns with our broader focus on interpretability and transparent model evaluation, motivating the inclusion of calibration and ranking-based visual metrics in future deliverables.
 
-\section{Template Notes}
+Reflecting on this, the team identified that while the current evaluation pipeline reports numerical accuracy and F1 scores, these metrics alone obscure which classes contribute most to performance variance. In the next phase, we plan to incorporate result graphs such as per-class F1 bars, calibration curves, and Top-\(k\) recall plots to provide a clearer picture of prediction reliability. We also intend to extend the baseline by implementing a BERT-based contextual model, which will be evaluated on the same fixed splits and metrics to isolate the contribution of semantic embeddings.
 
-You can remove this section or comment it out, as it only contains instructions for how to use this template. You may use subsections in your document as you find appropriate.
-
-\subsection{Tables and figures}
-
-See Table~\ref{citation-guide} for an example of a table and its caption.
-See Figure~\ref{fig:experiments} for an example of a figure and its caption.
-
-
-\begin{figure}[t]
-  \includegraphics[width=\columnwidth]{example-image-golden}
-  \caption{A figure with a caption that runs for more than one line.
-    Example image is usually available through the \texttt{mwe} package
-    without even mentioning it in the preamble.}
-  \label{fig:experiments}
-\end{figure}
-
-\begin{figure*}[t]
-  \includegraphics[width=0.48\linewidth]{example-image-a} \hfill
-  \includegraphics[width=0.48\linewidth]{example-image-b}
-  \caption {A minimal working example to demonstrate how to place
-    two images side-by-side.}
-\end{figure*}
-
-
-\subsection{Citations}
-
-\begin{table*}
-  \centering
-  \begin{tabular}{lll}
-    \hline
-    \textbf{Output}           & \textbf{natbib command} & \textbf{ACL only command} \\
-    \hline
-    \citep{Gusfield:97}       & \verb|\citep|           &                           \\
-    \citealp{Gusfield:97}     & \verb|\citealp|         &                           \\
-    \citet{Gusfield:97}       & \verb|\citet|           &                           \\
-    \citeyearpar{Gusfield:97} & \verb|\citeyearpar|     &                           \\
-    \citeposs{Gusfield:97}    &                         & \verb|\citeposs|          \\
-    \hline
-  \end{tabular}
-  \caption{\label{citation-guide}
-    Citation commands supported by the style file.
-  }
-\end{table*}
-
-Table~\ref{citation-guide} shows the syntax supported by the style files.
-We encourage you to use the natbib styles.
-You can use the command \verb|\citet| (cite in text) to get ``author (year)'' citations, like this citation to a paper by \citet{Gusfield:97}.
-You can use the command \verb|\citep| (cite in parentheses) to get ``(author, year)'' citations \citep{Gusfield:97}.
-You can use the command \verb|\citealp| (alternative cite without parentheses) to get ``author, year'' citations, which is useful for using citations within parentheses (e.g. \citealp{Gusfield:97}).
-
-\subsection{References}
-
-% (Remove nocite since all items are cited in Sections 2–3)
-% \nocite{Kauchali2020Resume,Joachims1998SVM,SaltonBuckley1988TermWeighting,Devlin2019BERT,Decorte2021JobBERT,Liu2022Title2Vec}
-
-
-Many websites where you can find academic papers also allow you to export a bib file for citation or bib formatted entry. Copy this into the \texttt{custom.bib} and you will be able to cite the paper in the \LaTeX{}. You can remove the example entries.
-
-\subsection{Equations}
-
-An example equation is shown below:
-\begin{equation}
-  \label{eq:example}
-  A = \pi r^2
-\end{equation}
-
-Labels for equation numbers, sections, subsections, figures and tables
-are all defined with the \verb|\label{label}| command and cross references
-to them are made with the \verb|\ref{label}| command.
-This an example cross-reference to Equation~\ref{eq:example}. You can also write equations inline, like this: $A=\pi r^2$.
-
+Moving forward, our focus will be on enhancing interpretability, experimenting with calibrated probability outputs, and validating whether transformer-derived embeddings improve performance consistency across minority classes. The feedback confirmed that our implementation direction is sound but encouraged deeper visualisation and comparative analysis to strengthen communication of model behaviour.
 
 % \section*{Limitations}
 
 \section*{Team Contributions}
 
-Write in this section a few sentences describing the contributions of each team member. What did each member work on? Refer to item 7.
+Imran Chowdhury implemented the data cleaning, TF-IDF feature extraction, and Linear SVC training pipeline, producing the final evaluation metrics and confusion matrices. Karim Elbasiouni refined the baseline models, updated visualisation outputs, and coordinated feedback with the teaching assistant. Rami Abu Sultan compiled the progress report, integrated code results, and finalised the submission in \LaTeX{}.
 
 % Bibliography entries for the entire Anthology, followed by custom entries
 %\bibliography{custom,anthology-overleaf-1,anthology-overleaf-2}
