@@ -24,11 +24,11 @@
 %
 % and set <dim> to something 5cm or larger.
 
-\title{Group X Progress Report:\\My Group's Project Name}
+\title{Group 85 Progress Report:\\CareerCompass}
 
 
-\author{First Author, Second Author, Third Author \\
-  \texttt{\{macid1,macid2,macid3\}@mcmaster.ca} }
+\author{Karim Elbasiouni, Imran Chowdhury, Rami Abu Sultan \\
+  \texttt{\{elbasik, chowdi13, abusultr\}@mcmaster.ca} }
 
 %\author{
 %  \textbf{First Author\textsuperscript{1}},
@@ -75,15 +75,24 @@
 
 \section{Introduction}
 
-Here, write a brief introduction to the problem you are solving. This can be adapted from your problem description and motivation from the original proposal. This should be around 0.25-0.5 pages.
-
+Job recruiters have an increased need for understanding how to better align job applicants skills and experience with the best available job posting. Manually reviewing unstructured resumes is slow, subjective, and is inefficient in a job market where thousands are applying for the same job opening. Our project reframes resume understanding as a resume-to-title classification task: ingest raw resumes, scrub PII, and map each document to a canonical job title and occupational family. The resulting labels can power dashboards that highlight dominant skill profiles and align job applicants with industry and company demands. Building on our proposal, we committed to fully automating data preparation and establishing a baseline model which will later be used for comparison to a more capable model.
 \section{Related Work}
 
-Here, talk about the related work you encountered for your approach. Cite at least 5 references. Refer to item 2. No one has done exactly your task? Write about the most similar thing you can find. This should be around 0.25-0.5 pages.
+Our approach draws on both older and newer ideas in text classification. Earlier works such as \citet{Joachims1998SVM} showed that linear SVMs, when paired with TF-IDF features, could handle high-dimensional text very well. Around the same time, \citet{SaltonBuckley1988TermWeighting} explored how adding term weights could make document retrieval more effective by balancing how often a word appears in one document versus across many documents. Those findings directly influenced how we designed our TF-IDF + LinearSVC baseline, keeping it interpretable and fast enough to deploy for advising job recruiters.
+
+In recent years, researchers have shifted toward models that capture meaning rather than just word frequency. A notable example is JobBERT introduced by \citet{Decorte2021JobBERT}, a transformer-based model designed to capture how job titles and skills are related. \citet{Liu2022Title2Vec} developed Title2Vec, which maps job titles into a shared numerical space so that similar roles can be grouped and compared more easily. Large pretrained models like BERT \citep{Devlin2019BERT} have proven effective at understanding general language and can be adapted to domains such as career analytics, where wording and phrasing vary across resumes.
+
+These studies helped guide how we approached CareerCompass. The early works gave us a solid foundation to begin our baseline model, and the newer methods discovered in recent years pointed us towards experimenting with fine-tuned BERT models to capture the subtle phrasing differences that can occur and better link resume text with standardized job titles.
 
 \section{Dataset}
 
-You should write about your dataset here, following the guidelines regarding item 1. This section may be 0.5-1 pages. Depending on your specific dataset, you may want to include subsections for the preprocessing, annotation, etc.
+We use the publicly available Kaggle Resume Dataset by Rayyan Kauchali (2020; CC BY 4.0) \citep{Kauchali2020Resume} consisting of a mix of real and synthetic/anonymized resumes intended for NLP research. Each record includes structured text sections such as Summary, Skills, Experience, and Education, plus a noisy title-like category field (Category). Raw files are placed under \texttt{data/raw/}, and all preprocessing is orchestrated by \texttt{build\_clean\_dataset.py}.
+
+Following our data plan, we applied a lightweight PII safeguard by redacting emails and phone numbers with deterministic regular expressions, then concatenated the key sections into a unified text field (\texttt{text\_clean}) and normalized it to \texttt{text\_norm}. Rows missing all major sections are dropped. This pipeline is reproducible via \texttt{build\_clean\_dataset.py} and supporting utilities (\texttt{src/data\_filter.py} and \texttt{src/text\_processing.py}), which write the canonical processed corpus to \texttt{data/processed/resumes\_v1.parquet} (and a CSV fallback).
+
+Label construction follows our proposal and current implementation: raw titles from \texttt{Category} are normalized via a curated alias map into canonical titles (\texttt{title\_raw}), and each canonical title is mapped to a coarse occupation family (\texttt{y\_family}) using a lookup table (e.g., "Computers / IT", "Business / Finance"). This family mapping is conceptually aligned with SOC major groups, and unmapped or rare titles are assigned to \texttt{Other} to mitigate class imbalance.
+
+Each record is assigned a stable \texttt{resume\_id} to support joins and splits. The processed dataset, exported in Parquet and CSV, serves as the single source for downstream feature extraction (TF-IDF) and supervised learning for two tasks: fine-grained job-title classification and coarse occupation family classification.
 
 \section{Features}
 
@@ -155,7 +164,9 @@ You can use the command \verb|\citealp| (alternative cite without parentheses) t
 
 \subsection{References}
 
-\nocite{Ando2005,andrew2007scalable,rasooli-tetrault-2015}
+% (Remove nocite since all items are cited in Sections 2–3)
+% \nocite{Kauchali2020Resume,Joachims1998SVM,SaltonBuckley1988TermWeighting,Devlin2019BERT,Decorte2021JobBERT,Liu2022Title2Vec}
+
 
 Many websites where you can find academic papers also allow you to export a bib file for citation or bib formatted entry. Copy this into the \texttt{custom.bib} and you will be able to cite the paper in the \LaTeX{}. You can remove the example entries.
 
@@ -181,6 +192,17 @@ Write in this section a few sentences describing the contributions of each team 
 
 % Bibliography entries for the entire Anthology, followed by custom entries
 %\bibliography{custom,anthology-overleaf-1,anthology-overleaf-2}
+
+\begin{filecontents}{custom.bib}
+@misc{Kauchali2020Resume,
+  author = {Rayyan Kauchali},
+  title = {Resume Dataset},
+  year = {2020},
+  howpublished = {Kaggle},
+  note = {CC BY 4.0},
+  url = {https://www.kaggle.com/rkauchali/resume-dataset}
+}
+\end{filecontents}
 
 % Custom bibliography entries only
 \bibliography{custom}
