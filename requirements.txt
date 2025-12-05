@@ -5,3 +5,9 @@ scipy
 joblib
 pyarrow
 matplotlib
+torch
+transformers
+datasets
+accelerate
+sentencepiece
+protobuf
