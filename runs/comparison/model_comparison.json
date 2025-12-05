@@ -1,0 +1,51 @@
+{
+  "models": {
+    "majority": {
+      "present": true,
+      "metrics_path": "/Users/imranchowdhury/CareerCompass/runs/majority_baseline/metrics.json"
+    },
+    "svm": {
+      "present": true,
+      "metrics_path": "/Users/imranchowdhury/CareerCompass/runs/svm_tfidf/metrics.json"
+    },
+    "bert": {
+      "present": false,
+      "metrics_path": "/Users/imranchowdhury/CareerCompass/runs/bert_title/metrics.json"
+    }
+  },
+  "validation": {
+    "majority": {
+      "accuracy": 0.05714285714285714,
+      "macro_f1": 0.003003003003003003
+    },
+    "svm": {
+      "accuracy": 0.9,
+      "macro_f1": 0.9356976162906252,
+      "top1": 0.9,
+      "top3": 0.9771428571428571
+    },
+    "bert": {
+      "accuracy": null,
+      "macro_f1": null
+    }
+  },
+  "test": {
+    "majority": {
+      "accuracy": 0.05714285714285714,
+      "macro_f1": 0.003003003003003003
+    },
+    "svm": {
+      "accuracy": 0.8857142857142857,
+      "macro_f1": 0.9242366855602149,
+      "top1": 0.8857142857142857,
+      "top3": 0.9742857142857143
+    },
+    "bert": {
+      "accuracy": null,
+      "macro_f1": null
+    }
+  },
+  "svm_hyperparameters": {
+    "best_C": 2.0
+  }
+}
