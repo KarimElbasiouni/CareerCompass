@@ -150,29 +150,80 @@ Any discrepancy between expected and observed performance, especially with trans
 
 \section{Evaluation}
 
-The evaluation followed a standardized 80 / 10 / 10 stratified train, validation, and test split across 3{,}500 resumes representing 36 canonical job titles. Splits were fixed by random seed to ensure reproducibility and balanced class distribution. All TF-IDF features (1--2 grams, min\_df = 3, max\_df = 0.9) were fit on the training subset only, preventing data leakage, and corresponding label encodings were regenerated consistently across runs.
+The evaluation followed the same standardized 80 / 10 / 10 train, validation, test split used at the progress stage, applied to the 3{,}500 resumes and 36 canonical job titles described earlier. Splits were generated with a fixed random seed (42) and stratification over the title label so that each class is represented in all splits. The training set contains all 36 classes with between 16 and 160 examples per class; validation and test each contain 350 examples, again covering all 36 classes with at least two examples per class. The most frequent titles (Java Developer, Data Science, Python Developer) have 160 training examples each, while the smallest classes (e.g., Technical Writer, Product Manager, Principal Engineer) have 16 to 24 training examples, leading to an imbalance of roughly 10:1 between the largest and smallest labels. This fixed, stratified split is used for all models (Majority, SVM, and BERT), rather than cross-validation, to simplify comparison and avoid the computational cost of repeatedly fine-tuning BERT.
 
-Model performance was assessed with accuracy, macro-averaged F1, and Top-\(k\) accuracy (\(k \in \{1, 3\}\)), consistent with our established evaluation framework. Accuracy captures overall correctness, while macro-F1 balances precision and recall across labels, countering the bias of frequent classes. Top-\(k\) accuracy quantifies the proportion of resumes for which the correct title appears within the \(k\) highest-scoring predictions, which is useful when semantically close occupations are interchangeable in context.
+All TF-IDF features (1 to 2 grams, min\_df = 3, max\_df = 0.9) are fit only on the training subset, and the fitted vectorizer is then applied to the validation and test sets, thereby preventing information leakage. Label encodings are regenerated consistently across runs using a shared label encoder so that every model sees the same mapping from title strings to integer IDs.
 
-The majority-class baseline, which always predicts the most common training title, reached only 0.057 accuracy and 0.003 macro-F1 on both validation and test splits, establishing a lower bound for comparison. By contrast, the Linear SVC trained on TF-IDF features achieved 0.900 validation accuracy (macro-F1 0.936) and 0.886 test accuracy (macro-F1 0.924) with \(C = 2.0\), while Top-3 accuracy exceeded 0.97 on both splits. The close alignment of validation and test results indicates good generalization and minimal overfitting. The corresponding confusion matrices in Figures~\ref{fig:confusion-val} and \ref{fig:confusion-test} confirm this trend: strong diagonal dominance indicates high per-class accuracy, while small off-diagonal clusters highlight overlap between related titles such as \emph{Python Developer} and \emph{Data Science}.
+\subsection{Metrics}
+
+Model performance is assessed with accuracy, macro-averaged F1, and Top-\(k\) accuracy (\(k \in \{1, 3\}\)), consistent with the framework used in the progress report. Accuracy captures overall correctness, while macro-F1 averages per-class F1 and therefore balances precision and recall across labels, countering the bias toward frequent titles. Top-\(k\) accuracy quantifies the proportion of resumes for which the correct title appears among the \(k\) highest-scoring predictions, which is particularly relevant in our setting where semantically close job titles (e.g., ``Java Developer'' vs ``Backend Developer'') may be interchangeable in context.
+
+For both the SVM and BERT models, we also visualize confusion matrices on the validation and test sets. These plots show class-wise prediction counts and normalized row percentages, revealing which titles are consistently identified and which are systematically confused. Error-analysis CSVs complement these figures by listing individual resumes, their true labels, and model predictions, making it easy to inspect hard examples in more detail.
+
+\subsection{Baseline Performance}
+
+The majority-class baseline, which always predicts the most common training title, achieves only 0.057 accuracy and 0.003 macro-F1 on both validation and test splits. This confirms that naive strategies are essentially useless in this 36-way classification setting and provides a lower bound for comparison.
+
+By contrast, the Linear SVC trained on TF-IDF features achieves 0.900 validation accuracy (macro-F1 0.936) and 0.886 test accuracy (macro-F1 0.924), with Top-3 accuracy exceeding 0.97 on both splits. These results reproduce and slightly refine the numbers reported in the progress report and indicate good generalization: the 1.4-point drop from validation to test is modest given the class imbalance. The SVM confusion matrices for validation and test (Figures~\ref{fig:confusion-val} and \ref{fig:confusion-test}) exhibit strong diagonal dominance, indicating high per-class accuracy, while small off-diagonal clusters highlight overlap between related titles such as Python Developer and Data Science or Java Developer and React Developer.
 
 \begin{center}
 \refstepcounter{figure}
 \includegraphics[width=\columnwidth]{../../runs/svm_tfidf/confusion_val.png}\\
-{\small \textbf{Figure \thefigure:} Confusion matrix on the validation set showing class-wise prediction counts and normalized row percentages for the Linear SVC baseline.}
+{\small Figure \thefigure: Confusion matrix on the validation set showing class-wise prediction counts and normalized row percentages for the Linear SVC baseline.}
 \label{fig:confusion-val}
 \end{center}
-
-Per-class inspection revealed that smaller categories, including \emph{React Developer}, \emph{Python Developer}, \emph{SQL Developer}, and \emph{Testing}, had F1 scores in the 0.65--0.75 range, largely due to limited samples and lexical similarity across adjacent roles. These systematic confusions suggest that richer semantic representations or broader data coverage could further improve minority-class performance. Overall, the Linear SVC provides a robust and interpretable baseline that meets the project's quantitative evaluation requirements. Future transformer-based or probability-calibrated models will be compared against this same split and metric configuration to ensure fair benchmarking.
 
 \begin{center}
 \refstepcounter{figure}
 \includegraphics[width=\columnwidth]{../../runs/svm_tfidf/confusion_test.png}\\
-{\small \textbf{Figure \thefigure:} Confusion matrix on the test set illustrating consistent performance across splits and limited confusion between related job titles.}
+{\small Figure \thefigure: Confusion matrix on the test set illustrating consistent performance across splits and limited confusion between related job titles.}
 \label{fig:confusion-test}
 \end{center}
 
+Per-class inspection confirms that smaller categories, including React Developer, Python Developer, SQL Developer, and Testing, have lower F1 scores (roughly 0.65 to 0.75) due to limited training data and lexical similarity across adjacent roles. These patterns motivated the introduction of a contextual model that can better exploit semantic cues in resumes.
+
+\subsection{BERT Performance and Comparison}
+
+We extended the evaluation to a BERT-based classifier fine-tuned on the same train/validation/test split. BERT uses the same title label space and assesses performance using identical metrics. On the validation set, the fine-tuned model attains 0.823 accuracy (macro-F1 0.888), which is lower than the SVM baseline. On the held-out test set, BERT reaches 0.880 accuracy and 0.924 macro-F1, effectively matching the SVM's macro-F1 but slightly underperforming it in accuracy (0.886 for SVM vs 0.880 for BERT).
+
+The BERT confusion matrices for validation and test (Figures~\ref{fig:bert-confusion-val} and \ref{fig:bert-confusion-test}) show a similar qualitative pattern to those of the SVM: most mass lies on the diagonal, but off-diagonal blocks remain for closely related developer roles. This suggests that while BERT can capture more nuance in the text, the limited dataset size and class imbalance constrain its ability to significantly outperform the well-tuned linear baseline. In other words, our SVM baseline is strong enough that BERT does not offer a clear win across all classes, a result that we analyze further in the error-analysis section.
+
+\begin{center}
+\refstepcounter{figure}
+\includegraphics[width=\columnwidth]{../../runs/bert_finetuned/confusion_val.png}\\
+{\small Figure \thefigure: Confusion matrix on the validation set for the fine-tuned BERT model, showing similar patterns to the SVM baseline.}
+\label{fig:bert-confusion-val}
+\end{center}
+
+\begin{center}
+\refstepcounter{figure}
+\includegraphics[width=\columnwidth]{../../runs/bert_finetuned/confusion_test.png}\\
+{\small Figure \thefigure: Confusion matrix on the test set for the fine-tuned BERT model, demonstrating consistent performance with the validation set.}
+\label{fig:bert-confusion-test}
+\end{center}
+
+\subsection{Top-\(k\) Behaviour and Hard Examples}
+
+To better understand how useful the models are in a ranking or ``shortlisting'' scenario, we examined Top-\(k\) recall on the test set. For the SVM, recall@1 corresponds to standard accuracy (0.886), while recall@2, @3, @4, and @5 increase to 0.937, 0.974, 0.983, and 0.989, respectively (Figure~\ref{fig:topk-curve}). This means that for nearly 99\% of resumes the correct title appears within the top five SVM predictions, even when the top-1 prediction is incorrect. This is important for practical use: a recruiter viewing the top few suggested titles would almost always see the true label among them.
+
+\begin{center}
+\refstepcounter{figure}
+\includegraphics[width=\columnwidth]{../../runs/evaluation/topk_curve.png}\\
+{\small Figure \thefigure: Top-\(k\) recall curve comparing SVM and BERT on the test set, demonstrating the utility of ranking-based evaluation for practical deployment scenarios.}
+\label{fig:topk-curve}
+\end{center}
+
+We complemented these aggregate curves with per-example error logs. On the test split, SVM is correct on 310 of 350 resumes (88.6\%), while the majority baseline is correct on only 20 (5.7\%). Approximately 10 to 11\% of resumes are misclassified by SVM, and around 10\% are ``hard cases'' where both SVM and the majority baseline fail. Inspection of these examples shows that they typically involve resumes whose skills or project descriptions are compatible with multiple adjacent roles (e.g., a Python-heavy resume labelled as Java Developer, or a mixed web-development profile labelled as Web Designing). These observations confirm that our chosen metrics (accuracy, macro-F1, Top-\(k\), and confusion matrices) are adequate and informative for understanding both global performance and class-specific weaknesses.
+
 \section{Progress}
+
+Our progress since the mid-semester report largely followed the trajectory we originally outlined, while incorporating several refinements motivated by TA feedback and practical constraints. In the progress report, we committed to (1) establishing a strong classical baseline using TF-IDF and a linear SVM, (2) developing an evaluation framework with clear quantitative and visual diagnostics, and (3) extending the system with a deeper contextual model such as BERT. All three goals were ultimately met, though the path to achieving the final objective evolved in response to implementation challenges.
+
+We fully completed the classical pipeline as planned: the TF-IDF feature extractor, stratified dataset splits, and Linear SVC baseline were developed and validated early, and the resulting performance matched expectations from the progress stage. TA feedback emphasized the need for more varied and interpretable evaluation outputs, and we incorporated this directly by expanding our evaluation tooling to include confusion matrices for both splits, Top-\(k\) accuracy curves, and detailed error-case CSVs. These additions strengthened the analysis and ensured our evaluation strategy aligned with the expectations outlined during feedback.
+
+The most significant change to our plan arose when implementing the transformer-based model. While our intention was to fine-tune BERT locally, we encountered repeated obstacles related to hardware limitations and model-weight downloads on the development machine. Fine-tuning BERT on CPU proved infeasible, and incomplete downloads prevented full local training. In response, we adapted by shifting BERT training to a collaborator's GPU-equipped environment. This adjustment preserved the scientific goals of our original plan while acknowledging real computational constraints. The resulting fine-tuned BERT model integrates cleanly with the rest of our pipeline, uses the same splits and metrics, and enabled a fair comparison against the SVM baseline.
+
+Overall, the project stayed true to its intended roadmap, with the primary deviations driven by pragmatic concerns rather than conceptual changes. The expanded evaluation framework, incorporation of TA feedback, and successful completion of a transformer model (despite hardware barriers) reflect an iterative and responsive workflow that strengthened the final system.
 
 \section{Error Analysis}
 
