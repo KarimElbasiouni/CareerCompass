@@ -10,10 +10,6 @@ from src.config import RUNS_DIR
 
 
 def load_metrics(path: Path) -> Optional[Dict[str, Any]]:
-    """
-    Load a metrics JSON file if it exists.
-    Return None if file does not exist.
-    """
     if not path.exists():
         return None
     try:
@@ -25,7 +21,6 @@ def load_metrics(path: Path) -> Optional[Dict[str, Any]]:
 
 
 def format_metric(value: Optional[float], decimals: int = 4) -> str:
-    """Format a metric value, handling None/N/A."""
     if value is None:
         return "N/A"
     return f"{value:.{decimals}f}"
@@ -38,20 +33,7 @@ def compare_models(
     output_path: Path | None = None,
     print_table: bool = True,
 ) -> Dict[str, Any]:
-    """
-    Load and compare metrics from different models.
 
-    Args:
-        majority_path: Path to majority baseline metrics.json
-        svm_path: Path to SVM metrics.json
-        bert_path: Path to BERT metrics.json (optional)
-        output_path: Path to save comparison JSON
-        print_table: Whether to print a formatted table to console
-
-    Returns:
-        Dictionary with comparison data
-    """
-    # Default paths
     if majority_path is None:
         majority_path = RUNS_DIR / "majority_baseline" / "metrics.json"
     if svm_path is None:
@@ -61,12 +43,10 @@ def compare_models(
     if output_path is None:
         output_path = RUNS_DIR / "comparison" / "model_comparison.json"
 
-    # Load metrics
     majority_metrics = load_metrics(majority_path)
     svm_metrics = load_metrics(svm_path)
     bert_metrics = load_metrics(bert_path)
 
-    # Build comparison structure
     comparison = {
         "models": {
             "majority": {
@@ -86,7 +66,6 @@ def compare_models(
         "test": {},
     }
 
-    # Extract validation metrics
     if majority_metrics and "val" in majority_metrics:
         comparison["validation"]["majority"] = {
             "accuracy": majority_metrics["val"].get("accuracy"),
@@ -118,7 +97,6 @@ def compare_models(
     else:
         comparison["validation"]["bert"] = {"accuracy": None, "macro_f1": None}
 
-    # Extract test metrics
     if majority_metrics and "test" in majority_metrics:
         comparison["test"]["majority"] = {
             "accuracy": majority_metrics["test"].get("accuracy"),
@@ -150,22 +128,18 @@ def compare_models(
     else:
         comparison["test"]["bert"] = {"accuracy": None, "macro_f1": None}
 
-    # Add SVM hyperparameter if available
     if svm_metrics and "best_C" in svm_metrics:
         comparison["svm_hyperparameters"] = {"best_C": svm_metrics["best_C"]}
 
-    # Save comparison JSON
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as f:
         json.dump(comparison, f, indent=2)
 
-    # Print formatted table
     if print_table:
         print("\n" + "=" * 80)
         print("MODEL COMPARISON")
         print("=" * 80)
 
-        # Validation metrics
         print("\nVALIDATION SET:")
         print("-" * 80)
         print(f"{'Model':<15} {'Accuracy':<12} {'Macro-F1':<12} {'Top-1':<12} {'Top-3':<12}")
@@ -190,7 +164,6 @@ def compare_models(
             f"{format_metric(bert_val['macro_f1']):<12} {'N/A':<12} {'N/A':<12}"
         )
 
-        # Test metrics
         print("\nTEST SET:")
         print("-" * 80)
         print(f"{'Model':<15} {'Accuracy':<12} {'Macro-F1':<12} {'Top-1':<12} {'Top-3':<12}")
@@ -266,7 +239,5 @@ def main() -> None:
         print_table=not args.no_print,
     )
 
-
 if __name__ == "__main__":
     main()
-

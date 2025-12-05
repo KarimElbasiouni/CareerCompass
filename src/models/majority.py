@@ -30,17 +30,14 @@ def main():
     target = "title_raw"
     maj = majority_label(train_df[target])
     
-    # Val predictions
     val_preds = [maj] * len(val_df)
     val_acc = accuracy_score(val_df[target].values, val_preds)
     val_f1 = f1_score(val_df[target].values, val_preds, average="macro", zero_division=0)
     
-    # Test predictions
     test_preds = [maj] * len(test_df)
     test_acc = accuracy_score(test_df[target].values, test_preds)
     test_f1 = f1_score(test_df[target].values, test_preds, average="macro", zero_division=0)
 
-    # Clean format matching SVM
     metrics = {
         "val": {
             "accuracy": val_acc,

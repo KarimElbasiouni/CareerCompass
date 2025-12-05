@@ -18,11 +18,6 @@ def macro_f1(y_true, y_pred) -> float:
 
 
 def confusion(y_true, y_pred, labels, display_labels=None, scale: float = 1.25) -> tuple[np.ndarray, plt.Figure]:
-    """
-    Bigger confusion matrix:
-    - scale: multiplies base side length
-    - shows count + row %
-    """
     cm = confusion_matrix(y_true, y_pred, labels=labels)
     n_classes = len(labels)
     tick_labels = display_labels if display_labels is not None else labels

@@ -28,7 +28,6 @@ DEFAULT_MODEL_DIR = config.MODELS_DIR / "bert_title"
 
 
 class ResumeDataset(torch.utils.data.Dataset):
-    """PyTorch Dataset for resume text classification."""
 
     def __init__(
         self,
@@ -37,15 +36,6 @@ class ResumeDataset(torch.utils.data.Dataset):
         tokenizer: BertTokenizer,
         max_length: int = 512,
     ):
-        """
-        Initialize dataset.
-
-        Args:
-            texts: List of resume text strings
-            labels: Array of integer-encoded labels
-            tokenizer: BERT tokenizer instance
-            max_length: Maximum sequence length for tokenization
-        """
         self.texts = texts
         self.labels = labels
         self.tokenizer = tokenizer
@@ -71,17 +61,6 @@ class ResumeDataset(torch.utils.data.Dataset):
 def load_or_fit_label_encoder(
     df_train: pd.DataFrame, label_col: str
 ) -> LabelEncoder:
-    """
-    Load an existing LabelEncoder from models_dir if present.
-    Otherwise fit on the train labels and save it.
-
-    Args:
-        df_train: Training dataframe
-        label_col: Name of label column
-
-    Returns:
-        LabelEncoder instance
-    """
     encoder_path = config.MODELS_DIR / "label_encoder.joblib"
     config.MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -99,15 +78,6 @@ def load_or_fit_label_encoder(
 
 
 def compute_metrics(pred):
-    """
-    Compute metrics for Hugging Face Trainer.
-
-    Args:
-        pred: Prediction object with predictions and label_ids
-
-    Returns:
-        Dictionary of metric names to values
-    """
     predictions = pred.predictions
     labels = pred.label_ids
 
@@ -203,11 +173,9 @@ def main() -> None:
     models_dir.mkdir(parents=True, exist_ok=True)
     runs_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load data
     print(f"[train_bert] Loading data from {args.parquet}")
     df = pd.read_parquet(args.parquet)
 
-    # Determine text column
     text_col = args.text_col
     if text_col not in df.columns:
         if "text_clean" in df.columns:
@@ -218,7 +186,6 @@ def main() -> None:
                 f"Text column '{args.text_col}' not found and no text_clean fallback."
             )
 
-    # Determine label column
     label_col = args.label_col
     if label_col not in df.columns:
         if "y_title" in df.columns:
@@ -229,12 +196,10 @@ def main() -> None:
                 f"Label column '{args.label_col}' not found and no y_title fallback."
             )
 
-    # Load splits
     print(f"[train_bert] Loading splits from {args.splits}")
     with open(args.splits, "r", encoding="utf-8") as f:
         splits = json.load(f)
 
-    # Create split dataframes
     train_ids = set(splits["train"])
     val_ids = set(splits["val"])
     test_ids = set(splits["test"])
@@ -248,17 +213,14 @@ def main() -> None:
         f"[train_bert] Splits: train={len(df_train)}, val={len(df_val)}, test={len(df_test)}"
     )
 
-    # Load or fit label encoder
     encoder = load_or_fit_label_encoder(df_train, label_col)
     num_labels = len(encoder.classes_)
     print(f"[train_bert] Number of classes: {num_labels}")
 
-    # Encode labels
     y_train = encoder.transform(df_train[label_col].astype(str))
     y_val = encoder.transform(df_val[label_col].astype(str))
     y_test = encoder.transform(df_test[label_col].astype(str))
 
-    # Load tokenizer and model
     if args.local_model_dir:
         local_dir = Path(args.local_model_dir)
         if not local_dir.exists():
@@ -279,7 +241,6 @@ def main() -> None:
                 f"Error: {e}"
             ) from e
     else:
-        # Try loading from cache first (offline mode)
         print(f"[train_bert] Attempting to load model from cache (offline mode): {args.model_name}")
         try:
             tokenizer = BertTokenizer.from_pretrained(args.model_name, local_files_only=True)
@@ -288,7 +249,6 @@ def main() -> None:
             )
             print(f"[train_bert] Successfully loaded from cache")
         except Exception as cache_error:
-            # If cache fails, try online download
             print(f"[train_bert] Cache load failed, attempting online download: {args.model_name}")
             print(f"[train_bert] Downloading tokenizer and model from Hugging Face Hub...")
             try:
@@ -312,7 +272,6 @@ def main() -> None:
     model.to(device)
     print(f"[train_bert] Using device: {device}")
 
-    # Create datasets
     train_texts = df_train[text_col].fillna("").astype(str).tolist()
     val_texts = df_val[text_col].fillna("").astype(str).tolist()
     test_texts = df_test[text_col].fillna("").astype(str).tolist()
@@ -321,7 +280,6 @@ def main() -> None:
     val_dataset = ResumeDataset(val_texts, y_val, tokenizer, args.max_length)
     test_dataset = ResumeDataset(test_texts, y_test, tokenizer, args.max_length)
 
-    # Training arguments
     training_args = TrainingArguments(
         output_dir=str(runs_dir),
         num_train_epochs=args.epochs,
@@ -339,7 +297,6 @@ def main() -> None:
         save_total_limit=2,
     )
 
-    # Trainer
     trainer = Trainer(
         model=model,
         args=training_args,
@@ -348,15 +305,12 @@ def main() -> None:
         compute_metrics=compute_metrics,
     )
 
-    # Train
     print("[train_bert] Starting training...")
     trainer.train()
 
-    # Evaluate on validation
     print("[train_bert] Evaluating on validation set...")
     val_results = trainer.evaluate(eval_dataset=val_dataset)
 
-    # Evaluate on test
     print("[train_bert] Evaluating on test set...")
     test_predictions = trainer.predict(test_dataset)
     test_logits = test_predictions.predictions
@@ -365,10 +319,8 @@ def main() -> None:
     test_accuracy = eval_metrics.accuracy(y_test, test_preds)
     test_macro_f1 = eval_metrics.macro_f1(y_test, test_preds)
 
-    # Confusion matrices
     print("[train_bert] Generating confusion matrices...")
 
-    # Validation confusion matrix
     val_predictions = trainer.predict(val_dataset)
     val_logits = val_predictions.predictions
     val_preds = np.argmax(val_logits, axis=-1)
@@ -383,7 +335,6 @@ def main() -> None:
     val_fig.savefig(val_fig_path, dpi=150, bbox_inches="tight")
     plt.close(val_fig)
 
-    # Test confusion matrix
     test_cm, test_fig = eval_metrics.confusion(
         y_test,
         test_preds,
@@ -394,7 +345,6 @@ def main() -> None:
     test_fig.savefig(test_fig_path, dpi=150, bbox_inches="tight")
     plt.close(test_fig)
 
-    # Save metrics
     metrics = {
         "val": {
             "accuracy": val_results["eval_accuracy"],
@@ -410,12 +360,10 @@ def main() -> None:
     with metrics_path.open("w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=2)
 
-    # Save model and tokenizer
     print(f"[train_bert] Saving model and tokenizer to {models_dir}")
     model.save_pretrained(models_dir)
     tokenizer.save_pretrained(models_dir)
 
-    # Print summary
     print(f"[train_bert] Training complete!")
     print(f"[train_bert] Validation: acc={metrics['val']['accuracy']:.4f}, macro_f1={metrics['val']['macro_f1']:.4f}")
     print(f"[train_bert] Test: acc={metrics['test']['accuracy']:.4f}, macro_f1={metrics['test']['macro_f1']:.4f}")
@@ -425,5 +373,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
-
+    main()s

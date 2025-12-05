@@ -23,12 +23,7 @@ from src.utils.splits import load_splits
 
 
 def load_svm_model() -> Tuple[any, any, any]:
-    """
-    Load SVM model, vectorizer, and label encoder.
 
-    Returns:
-        Tuple of (model, vectorizer, label_encoder)
-    """
     model_path = MODELS_DIR / "svm_title.joblib"
     vectorizer_path = FEATURES_DIR / "tfidf_vectorizer.joblib"
     encoder_path = MODELS_DIR / "label_encoder.joblib"
@@ -52,19 +47,12 @@ def load_svm_model() -> Tuple[any, any, any]:
 
 
 def load_bert_model():
-    """
-    Load BERT model, tokenizer, and label encoder if available.
-
-    Returns:
-        Tuple of (model, tokenizer, label_encoder, device) or None if not available
-    """
     try:
         from src.models.inference_bert import load_bert_model
 
         model_dir = MODELS_DIR / "bert_title"
         if not model_dir.exists():
             return None
-        # Check if directory is empty or missing model files
         if not any(model_dir.glob("*.bin")) and not any(model_dir.glob("*.safetensors")):
             return None
         return load_bert_model(model_dir)
@@ -93,16 +81,7 @@ def predict_svm(
 
 
 def predict_bert(texts: List[str], bert_artifacts: Tuple) -> Tuple[np.ndarray, List[str]]:
-    """
-    Generate BERT predictions for texts.
 
-    Args:
-        texts: List of text strings
-        bert_artifacts: Tuple from load_bert_model()
-
-    Returns:
-        Tuple of (predicted_indices, predicted_labels)
-    """
     from src.models.inference_bert import predict_bert
 
     model, tokenizer, label_encoder, device = bert_artifacts
@@ -115,32 +94,19 @@ def analyze_errors(
     output_dir: Path | None = None,
     include_bert: bool = True,
 ) -> pd.DataFrame:
-    """
-    Perform error analysis comparing SVM, Majority, and optionally BERT.
 
-    Args:
-        split: Which split to analyze ('val' or 'test')
-        output_dir: Directory to save error analysis CSV
-        include_bert: Whether to include BERT in analysis (if available)
-
-    Returns:
-        DataFrame with error analysis results
-    """
     if output_dir is None:
         output_dir = RUNS_DIR / "comparison"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load data and splits
     print(f"[error_analysis] Loading data and splits...")
     df = pd.read_parquet(PROCESSED_PARQUET)
     splits = load_splits()
 
-    # Filter to requested split
     split_ids = set(splits[split])
     df_split = df[df["resume_id"].astype(str).isin(split_ids)].copy()
     df_split = df_split.reset_index(drop=True)
 
-    # Get true labels
     label_col = "title_raw"
     true_labels = df_split[label_col].astype(str).values
     resume_ids = df_split["resume_id"].astype(str).values
@@ -148,27 +114,22 @@ def analyze_errors(
 
     print(f"[error_analysis] Analyzing {len(df_split)} samples from {split} set...")
 
-    # Load models
     print(f"[error_analysis] Loading SVM model...")
     svm_model, svm_vectorizer, label_encoder = load_svm_model()
 
-    # Get majority label from training data
     train_ids = set(splits["train"])
     df_train = df[df["resume_id"].astype(str).isin(train_ids)]
     majority_label_str = get_majority_label(df_train, label_col)
 
-    # Generate predictions
     print(f"[error_analysis] Generating SVM predictions...")
     svm_pred_indices, svm_pred_labels = predict_svm(texts, svm_model, svm_vectorizer, label_encoder)
 
     print(f"[error_analysis] Generating Majority predictions...")
     majority_pred_labels = [majority_label_str] * len(df_split)
 
-    # Encode true labels for comparison
     true_indices = label_encoder.transform(true_labels)
     majority_pred_indices = label_encoder.transform(majority_pred_labels)
 
-    # BERT predictions (if available)
     bert_available = False
     bert_pred_indices = None
     bert_pred_labels = None
@@ -183,7 +144,6 @@ def analyze_errors(
         else:
             print(f"[error_analysis] BERT model not available, skipping...")
 
-    # Build error analysis DataFrame
     error_data = {
         "resume_id": resume_ids,
         "true_label": true_labels,
@@ -199,29 +159,21 @@ def analyze_errors(
 
     error_df = pd.DataFrame(error_data)
 
-    # Categorize errors
     print(f"[error_analysis] Categorizing errors...")
 
-    # Both wrong (hard cases)
     error_df["both_wrong"] = ~error_df["svm_correct"] & ~error_df["majority_correct"]
 
     if bert_available:
-        # SVM wrong / BERT right (improvement)
         error_df["svm_wrong_bert_right"] = ~error_df["svm_correct"] & error_df["bert_correct"]
-        # SVM right / BERT wrong (regression)
         error_df["svm_right_bert_wrong"] = error_df["svm_correct"] & ~error_df["bert_correct"]
-        # Both SVM and BERT wrong
         error_df["svm_bert_both_wrong"] = ~error_df["svm_correct"] & ~error_df["bert_correct"]
 
-    # Add text snippets (truncated for readability)
     error_df["text_snippet"] = [text[:200] + "..." if len(text) > 200 else text for text in texts]
 
-    # Save to CSV
     output_path = output_dir / f"error_cases_{split}.csv"
     error_df.to_csv(output_path, index=False)
     print(f"[error_analysis] Error analysis saved to: {output_path}")
 
-    # Print summary statistics
     print("\n" + "=" * 80)
     print("ERROR ANALYSIS SUMMARY")
     print("=" * 80)
@@ -244,7 +196,6 @@ def analyze_errors(
 
 
 def main() -> None:
-    """CLI entrypoint for error analysis."""
     import argparse
 
     parser = argparse.ArgumentParser(description="Analyze prediction errors across models")

@@ -59,7 +59,6 @@ def build_tfidf_features(
     out_dir: Path = FEATURES_DIR,
     seed: int = RANDOM_SEED,
 ) -> TfidfArtifacts:
-    """Fit a TF-IDF vectorizer (train-only) and save aligned artifacts."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     df = pd.read_parquet(parquet_path)
@@ -153,7 +152,6 @@ def main() -> None:
     print(f"[tfidf] matrix     -> {artifacts.matrix_path}")
     print(f"[tfidf] index      -> {artifacts.index_path}")
     print(f"[tfidf] splits     -> {artifacts.splits_path}")
-
 
 if __name__ == "__main__":
     main()

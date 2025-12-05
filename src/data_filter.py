@@ -3,13 +3,11 @@
 import pandas as pd
 from src.load_dataset import load_jsonl_dataset
 
-# columns to join into one big text field
 IMPORTANT_FIELDS = ["Summary", "Experience", "Education", "Skills", "Text"]
 
 def load_and_filter() -> pd.DataFrame:
     df = load_jsonl_dataset()
 
-    # keep rows that have at least one of the important text fields
     keep_mask = df[IMPORTANT_FIELDS].notna().any(axis=1)
     df = df[keep_mask].copy()
 

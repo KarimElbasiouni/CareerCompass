@@ -1,18 +1,13 @@
-# src/label_creation.py
-
 import pandas as pd
 
-# map raw categories to a cleaner label
 CATEGORY_NORMALIZATION = {
     "software engineer": "Software Engineer",
     "java developer": "Java Developer",
     "data scientist": "Data Scientist",
     "accountant": "Accountant",
     "project manager": "Project Manager",
-    # add more as you see them
 }
 
-# map cleaner label to a family
 FAMILY_LOOKUP = {
     "Software Engineer": "Computers / IT",
     "Java Developer": "Computers / IT",
@@ -25,7 +20,7 @@ def normalize_category(raw_cat: str) -> str:
     if not isinstance(raw_cat, str):
         return "Other"
     t = raw_cat.strip().lower()
-    return CATEGORY_NORMALIZATION.get(t, raw_cat.strip())  # fallback to original nicely stripped
+    return CATEGORY_NORMALIZATION.get(t, raw_cat.strip())
 
 def to_family(clean_label: str) -> str:
     return FAMILY_LOOKUP.get(clean_label, "Other")

@@ -15,7 +15,6 @@ SplitDict = Dict[str, List[str]]
 
 
 def load_splits(path: Path | None = None) -> SplitDict | None:
-    """Load an existing splits JSON if present."""
     splits_path = Path(path or SPLITS_JSON)
     if not splits_path.exists():
         return None
@@ -24,7 +23,6 @@ def load_splits(path: Path | None = None) -> SplitDict | None:
 
 
 def save_splits(splits: Mapping[str, Iterable[str]], path: Path | None = None) -> Path:
-    """Persist splits to disk."""
     splits_path = Path(path or SPLITS_JSON)
     splits_path.parent.mkdir(parents=True, exist_ok=True)
     serializable = {k: list(v) for k, v in splits.items()}
@@ -40,7 +38,6 @@ def ensure_splits(
     splits_path: Path | None = None,
     seed: int = RANDOM_SEED,
 ) -> SplitDict:
-    """Return existing splits or create stratified ones if missing."""
     existing = load_splits(splits_path)
     if existing is not None:
         return existing
