@@ -53,7 +53,7 @@ Thumbs.db
 *~
 *.swp
 *.tmp
-
+*.bin
 # If you add compiled models or other large binaries under src/ during development,
 # consider adding them here (example):
 # models/
