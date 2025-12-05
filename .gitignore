@@ -29,7 +29,7 @@ Thumbs.db
 *.rar
 *.exe
 *.dll
-
+*.bin
 # Logs and runtime files
 *.log
 logs/
