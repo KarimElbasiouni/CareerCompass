@@ -227,13 +227,92 @@ Overall, the project stayed true to its intended roadmap, with the primary devia
 
 \section{Error Analysis}
 
+We compared a Linear SVM using TF-IDF features with a fine-tuned BERT model on both validation and test splits. Our analysis focuses on where they agree, where they differ, and the main types of errors they make.
+
+\subsection{Performance Comparison}
+
+Table~\ref{tab:model-comparison} summarizes the results. The SVM reached 88.6\% test accuracy with a macro-F1 of 0.924. BERT achieved 88.0\% test accuracy, also with a macro-F1 of 0.924. In other words, both models performed essentially the same on the held-out test set.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lccc}
+\hline
+\textbf{Metric} & \textbf{SVM} & \textbf{BERT} & \textbf{Delta} \\
+\hline
+Val Accuracy    & 0.900  & 0.823  & -0.077 \\
+Val Macro-F1    & 0.936  & 0.888  & -0.048 \\
+Test Accuracy   & 0.886  & 0.880  & -0.006 \\
+Test Macro-F1   & 0.924  & 0.924  & +0.000 \\
+\hline
+\end{tabular}
+\caption{SVM and BERT performance on validation and test sets. BERT lags SVM on validation but closes the gap on the test set.}
+\label{tab:model-comparison}
+\end{table}
+
+BERT improved from 82.3\% accuracy on validation to 88.0\% on test, a 5.7-point gain. In contrast, SVM was more stable, dropping only slightly from 90.0\% to 88.6\%. This pattern suggests that BERT struggled with some specifics of the validation set but still learned patterns that transfer well to unseen data, ultimately matching SVM on the test set.
+
+\subsection{Understanding the Validation–Test Gap}
+
+The 5.7-point gap between BERT's validation and test accuracy can be explained by three main factors:
+
+\textbf{1. Early stopping on a biased signal.} We selected BERT checkpoints using validation macro-F1. The validation split appears to contain a higher proportion of minority classes or harder disambiguation cases than the test set. As a result, early stopping likely triggered before BERT fully converged on patterns that generalize beyond these difficult examples.
+
+\textbf{2. High variance from a small validation set.} The validation set has 350 samples spread across 36 classes, or about 9.7 examples per class on average. With such a small per-class sample size, random variation in which resumes land in validation versus test can significantly affect scores. If validation happens to include more ambiguous resumes (e.g., borderline \emph{Python Developer} vs.\ \emph{Data Science}), the lower validation score may reflect a harder split rather than a weaker model.
+
+\textbf{3. Constrained hyperparameters.} BERT was fine-tuned under strict computational constraints: 2 epochs, batch size 4, and a maximum sequence length of 128 tokens on CPU. These settings limited convergence and underutilized the model's capacity. In contrast, the SVM's regularization parameter \(C\) was tuned directly on validation via grid search. This asymmetry makes it easier for SVM to look strong on validation.
+
+Taken together, these factors explain why BERT underperforms on validation yet catches up on the test set. The identical test macro-F1 suggests that, despite the noisy validation signal and constrained training setup, BERT still learned decision boundaries comparable to SVM's on unseen data.
+
+\subsection{Where the Models Differ}
+
+Although overall test performance is almost identical, the models tend to make different kinds of mistakes.
+
+\textbf{BERT's strengths.} Because BERT uses contextual embeddings, it is better at using the surrounding words to interpret a phrase. For example, it can distinguish between ``developed machine learning models using pandas'' and ``built REST APIs in Python,'' even though both mention Python and common data libraries. In such cases, BERT can tell apart \emph{Data Science} from \emph{Python Developer} by focusing on verb–object relationships and the overall phrasing, whereas TF-IDF treats ``Python'' and ``pandas'' as largely independent features.
+
+\textbf{SVM's strengths.} The SVM benefits from having access to the full document representation via TF-IDF. Because it aggregates terms across the entire resume, it can leverage information from later sections such as certifications or additional projects. Our BERT setup truncated resumes to 128 tokens, which can drop content that appears near the end of the document. The SVM is also far more efficient: it trains roughly 36 times faster (about 10 minutes vs.\ 6 hours) and uses about 88 times less memory (5MB vs.\ 440MB).
+
+\subsection{Shared Strengths}
+
+Both models perform best on classes that have plenty of training data and a clearly distinctive vocabulary. When a role is associated with a consistent set of tools, technologies, or domain-specific terms, and appears frequently enough in the training set, SVM and BERT both achieve high precision and recall.
+
+In practice, this means that well-represented titles with unambiguous language tend to have F1 scores close to 1.0 for both models, and neither model shows a clear advantage on these easier categories. The remaining improvements are therefore concentrated on minority or semantically overlapping roles, where the vocabulary is less distinctive or the boundary between labels is inherently fuzzy.
+
+\subsection{Shared Weaknesses}
+
+The two models also share several systematic failure modes, which account for most of their residual errors:
+
+\textbf{1. Semantic overlap (Majority of the errors).} Many technical roles use nearly identical vocabularies. \emph{Python Developer} and \emph{Data Science} resumes both mention pandas, NumPy, scikit-learn, and Jupyter. The real difference is often in how those tools are used: building production APIs versus performing analytics and modeling. Both models struggle on resumes that mix these signals.
+
+The same issue appears for \emph{React Developer} versus \emph{Web Developer}, where frontend technologies such as React, Angular, and Vue.js overlap, and for \emph{Testing} versus \emph{QA Engineer}, which are often interchangeable titles. In these cases, label noise (ambiguous or overlapping ground-truth labels) is a significant contributor, not just model capacity.
+
+\textbf{2. Career transitions.} Many resumes describe a career path instead of a single static role. For example, a candidate might have 5 years as a QA Engineer followed by 1 year in DevOps. Our ground truth labels such resumes as \emph{DevOps Engineer} (based on the most recent role), while both models often predict \emph{Testing} or a related QA title, reflecting the majority of the experience. This exposes a limitation of single-label classification for time-evolving careers.
+
+\textbf{3. Generic descriptions.} Some resumes use vague or high-level language with few concrete skills or tools. In these cases, there is not enough signal to distinguish between similar titles, and both models tend to default toward more frequent or generic classes.
+
+\subsection{Future Directions}
+
+Based on these observations, several directions appear promising for improving classification performance:
+
+\textbf{Hierarchical classification.} Instead of predicting fine-grained job titles in one step, we could first predict a coarse job family (e.g., Engineering, Healthcare, Sales), then refine the prediction within that family. This would reduce confusion between distant categories and focus the model on finer distinctions only when appropriate.
+
+\textbf{Multi-label classification.} Allowing resumes to have multiple labels would better reflect real-world career paths and hybrid roles, such as a combination of \emph{Full-Stack Developer} and \emph{DevOps Engineer}. This would address many of the errors we observe on resumes that span several roles over time.
+
+\textbf{Ensemble methods.} Because SVM and BERT make different types of mistakes, combining their predictions could yield better overall performance. For example, a weighted voting or stacking approach could use BERT when contextual cues are critical and SVM when long-range document information is more important. Such an ensemble could plausibly push test accuracy above 90\%.
+
+\subsection{Summary}
+
+Overall, Linear SVM and BERT deliver almost the same test performance (88.6\% vs.\ 88.0\% accuracy, both with 0.924 macro-F1). BERT's weaker validation results are best explained by small-sample variance and conservative hyperparameters rather than a fundamental limitation of the model. Both approaches perform strongly on well-represented, clearly defined job titles (with more than 80 examples) and struggle in similar ways on overlapping technical roles and ambiguous labels.
+
+Given current constraints, the SVM is the more practical choice for deployment in CareerCompass: it offers much faster training and inference, a far smaller memory footprint, and more interpretable feature weights. BERT remains a strong candidate for future iterations of the system, particularly if we can train with longer sequences, better-tuned hyperparameters, and potentially larger or more carefully curated datasets.
+
+
 % \section*{Limitations}
 
 \section*{Team Contributions}
 
-Karim Elbasiouni implemented the end-to-end data pipeline, which includes configuration, raw JSONL loading, filtering and section validation, label normalization and family mapping, PII scrubbing, and the reproducible build script.
-Imran Chowdhury implemented the modeling and evaluation, which includes TF-IDF feature construction and Linear SVC training pipeline, producing the final evaluation metrics and confusion matrices. Rami Abu Sultan compiled the progress report, integrated code results, and finalized the submission in \LaTeX{}.
-
+Karim Elbasiouni wrote the report, interpreted results, and performed error analysis.
+Imran Chowdhury implemented the modeling and evaluation, which includes final fine-tuned BERT model producing the final evaluation metrics and confusion matrices. Rami Abu Sultan performed intensive research, gathering recent studies on BERT in text classification, and integrated code results.
 % Bibliography entries for the entire Anthology, followed by custom entries
 %\bibliography{custom,anthology-overleaf-1,anthology-overleaf-2}
 
