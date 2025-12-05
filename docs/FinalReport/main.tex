@@ -76,11 +76,14 @@
 \section{Introduction}
 
 Job recruiters have an increased need for understanding how to better align job applicants skills and experience with the best available job posting. Manually reviewing unstructured resumes is slow, subjective, and is inefficient in a job market where thousands are applying for the same job opening. Our project reframes resume understanding as a resume-to-title classification task: ingest raw resumes, scrub PII, and map each document to a canonical job title and occupational family. The resulting labels can power dashboards that highlight dominant skill profiles and align job applicants with industry and company demands. Building on our proposal, we committed to fully automating data preparation and establishing a baseline model which will later be used for comparison to a more capable model.
-\section{Related Work}
 
-Our approach draws on both older and newer ideas in text classification. Earlier works such as \citet{Joachims1998SVM} showed that linear SVMs, when paired with TF-IDF features, could handle high-dimensional text very well. Around the same time, \citet{SaltonBuckley1988TermWeighting} explored how adding term weights could make document retrieval more effective by balancing how often a word appears in one document versus across many documents. Those findings directly influenced how we designed our TF-IDF + LinearSVC baseline, keeping it interpretable and fast enough to deploy for advising job recruiters.
+Our approach for our baseline draws on both older and newer ideas in text classification. Earlier works such as \citet{Joachims1998SVM} showed that linear SVMs, when paired with TF-IDF features, could handle high-dimensional text very well. Around the same time, \citet{SaltonBuckley1988TermWeighting} explored how adding term weights could make document retrieval more effective by balancing how often a word appears in one document versus across many documents. Those findings directly influenced how we designed our TF-IDF + LinearSVC baseline, keeping it interpretable and fast enough to deploy for advising job recruiters.
 
 In recent years, researchers have shifted toward models that capture meaning rather than just word frequency. A notable example is JobBERT introduced by \citet{Decorte2021JobBERT}, a transformer-based model designed to capture how job titles and skills are related. \citet{Liu2022Title2Vec} developed Title2Vec, which maps job titles into a shared numerical space so that similar roles can be grouped and compared more easily. Large pretrained models like BERT \citep{Devlin2019BERT} have proven effective at understanding general language and can be adapted to domains such as career analytics, where wording and phrasing vary across resumes.
+
+\citet{inproceedings} compared TF-IDF with LinearSVC, LSTM models, and BERT on several text classification tasks. BERT reached higher accuracy on tasks that required context and phrasing awareness. The model improved with more training epochs and produced stronger results on difficult examples. TF-IDF with LinearSVC stayed fast, but its accuracy stopped improving early, while BERT continued to gain accuracy and handled subtle differences in language. This study supported our plan to add a BERT model to improve title prediction and reduce errors between similar roles.
+
+We plan to fine tune BERT with methods that target the needs of our task. Researchers \citet{sun2020finetuneberttextclassification} have shown that fine tuning benefits from small design choices such as handling long text, selecting the right layers to update, and using careful learning rates. Further pre training on domain data can also strengthen the model when the target text differs from the original training corpus. Multi task fine tuning offers another path when related datasets are available. These strategies guide how we prepare BERT to work with resume text and job titles.
 
 These studies helped guide how we approached CareerCompass. The early works gave us a solid foundation to begin our baseline model, and the newer methods discovered in recent years pointed us towards experimenting with fine-tuned BERT models to capture the subtle phrasing differences that can occur and better link resume text with standardized job titles.
 
@@ -94,13 +97,12 @@ Label construction follows our proposal and current implementation: raw titles f
 
 Each record is assigned a stable \texttt{resume\_id} to support joins and splits. The processed dataset, exported in Parquet and CSV, serves as the single source for downstream feature extraction (TF-IDF) and supervised learning for two tasks: fine-grained job-title classification and coarse occupation family classification.
 
-\section{Features}
+\section{Features \& Inputs}
 
 Each resume was represented as a normalized text document derived by concatenating its major sections (Summary, Experience, Skills, and Education) after removing personal identifiers, converting all text to lowercase, and tokenizing the content. The resulting corpus was transformed into a bag-of-words representation using TF-IDF weighting, which encodes term importance by balancing local frequency against global rarity. Both unigrams and bigrams were included to capture short professional phrases while maintaining the independence assumptions of classical vector-space models. Tokens appearing in fewer than 3 resumes or in more than 90\% of documents were removed to reduce high-variance rare features and low-information common words, minimizing overfitting and improving generalization. The vectorizer was trained only on the training subset to avoid data leakage, and no further feature selection or augmentation was applied beyond the statistical weighting inherent in TF-IDF. This high-dimensional sparse matrix, about 80{,}000 features across 3{,}500 samples, serves as the fixed input for the baseline classifiers evaluated in the next section.
 
 \section{Implementation}
-
-Our current pipeline implements two baselines for resume-to-title classification: a majority-class heuristic and a Linear Support Vector Classifier (LinearSVC) trained on TF--IDF features. The majority model always predicts the most frequent training label, establishing a lower-bound accuracy of 0.057. The LinearSVC replaces this with a margin-based learner that separates classes in the high-dimensional TF--IDF space while remaining lightweight and interpretable. Training uses the pre-split data (80 / 10 / 10) generated by the cleaning pipeline, ensuring reproducibility across runs.
+Our final pipeline implements two baselines for resume-to-title classification: a majority-class heuristic and a Linear Support Vector Classifier (LinearSVC) trained on TF--IDF features, and our main model, which is a fine-tuned BERT model for job title classification. The majority model always predicts the most frequent training label, establishing a lower-bound accuracy of 0.057. The LinearSVC replaces this with a margin-based learner that separates classes in the high-dimensional TF--IDF space while remaining lightweight and interpretable. Training uses the pre-split data (80 / 10 / 10) generated by the cleaning pipeline, ensuring reproducibility across runs.
 
 The LinearSVC optimises the soft-margin hinge-loss objective
 \begin{equation}
@@ -113,7 +115,7 @@ Training artifacts (vectorizer, encoded labels, model weights, and confusion mat
 
 The primary limitation of this setup is its reliance on lexical features: semantically similar phrases may be treated as unrelated, and the model produces uncalibrated decision margins rather than probabilities. These constraints motivate the next step, introducing a BERT-based contextual encoder fine-tuned with a softmax output and cross-entropy loss, optimized via AdamW. This comparison will
 
-\section{Results and Evaluation}
+\section{Evaluation}
 
 The evaluation followed a standardized 80 / 10 / 10 stratified train, validation, and test split across 3{,}500 resumes representing 36 canonical job titles. Splits were fixed by random seed to ensure reproducibility and balanced class distribution. All TF-IDF features (1--2 grams, min\_df = 3, max\_df = 0.9) were fit on the training subset only, preventing data leakage, and corresponding label encodings were regenerated consistently across runs.
 
@@ -137,14 +139,9 @@ Per-class inspection revealed that smaller categories, including \emph{React Dev
 \label{fig:confusion-test}
 \end{center}
 
+\section{Progress}
 
-\section{Feedback and Plans}
-
-Our TA's primary feedback emphasized the need for clearer and more varied visualizations of results, suggesting the addition of summary graphs or alternative plots beyond the confusion matrix to make class-level performance easier to interpret. This aligns with our broader focus on interpretability and transparent model evaluation, motivating the inclusion of calibration and ranking-based visual metrics in future deliverables.
-
-Reflecting on this, the team identified that while the current evaluation pipeline reports numerical accuracy and F1 scores, these metrics alone obscure which classes contribute most to performance variance. In the next phase, we plan to incorporate result graphs such as per-class F1 bars, calibration curves, and Top-\(k\) recall plots to provide a clearer picture of prediction reliability. We also intend to extend the baseline by implementing a BERT-based contextual model, which will be evaluated on the same fixed splits and metrics to isolate the contribution of semantic embeddings.
-
-Moving forward, our focus will be on enhancing interpretability, experimenting with calibrated probability outputs, and validating whether transformer-derived embeddings improve performance consistency across minority classes. The feedback confirmed that our implementation direction is sound but encouraged deeper visualization and comparative analysis to strengthen communication of model behaviour.
+\section{Error Analysis}
 
 % \section*{Limitations}
 
